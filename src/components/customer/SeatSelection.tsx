@@ -7,7 +7,7 @@ import type { BusSchedule, Seat, SeatStatus } from '@/types';
 
 interface Props {
   schedule: BusSchedule;
-  onConfirm: (seatId: string) => void;
+  onConfirm: (seatIds: string[]) => void;
   onBack: () => void;
 }
 
@@ -15,7 +15,6 @@ function formatPrice(n: number) {
   return 'Rp ' + n.toLocaleString('id-ID');
 }
 
-/* ── Seat colour scheme ──────────────────────────────── */
 function seatStyle(status: SeatStatus): React.CSSProperties {
   switch (status) {
     case 'booked':
@@ -45,7 +44,7 @@ function seatStyle(status: SeatStatus): React.CSSProperties {
 }
 
 export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
-  const [selectedSeat, setSelectedSeat] = useState<string>('');
+  const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
 
   const seats: Seat[] = useMemo(() => {
     const arr: Seat[] = [];
@@ -54,35 +53,39 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
     for (let r = 1; r <= rows; r++) {
       for (const l of labels) {
         const id = `${r}${l}`;
-        const idx = arr.length;
-        if (idx >= schedule.totalSeats) break;
+        if (arr.length >= schedule.totalSeats) break;
         arr.push({
           id,
           status: schedule.bookedSeats.includes(id)
             ? 'booked'
-            : id === selectedSeat
+            : selectedSeats.has(id)
             ? 'selected'
             : 'available',
         });
       }
     }
     return arr;
-  }, [schedule, selectedSeat]);
+  }, [schedule, selectedSeats]);
 
   const handleSeatClick = useCallback((seat: Seat) => {
     if (seat.status === 'booked') return;
-    setSelectedSeat((prev) => (prev === seat.id ? '' : seat.id));
+    setSelectedSeats((prev) => {
+      const next = new Set(prev);
+      if (next.has(seat.id)) next.delete(seat.id);
+      else next.add(seat.id);
+      return next;
+    });
   }, []);
 
   const rows = useMemo(() => {
     const result: Seat[][] = [];
-    for (let i = 0; i < seats.length; i += 4) {
-      result.push(seats.slice(i, i + 4));
-    }
+    for (let i = 0; i < seats.length; i += 4) result.push(seats.slice(i, i + 4));
     return result;
   }, [seats]);
 
   const available = schedule.totalSeats - schedule.bookedSeats.length;
+  const selectedList = Array.from(selectedSeats).sort();
+  const totalPrice = schedule.price * selectedSeats.size;
 
   return (
     <motion.div
@@ -99,7 +102,7 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
           whileTap={{ scale: 0.95 }}
           className="btn btn-secondary btn-icon"
           onClick={onBack}
-          style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 'var(--radius)', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)' }}
+          style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 'var(--radius)', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <span style={{ fontSize: 24, lineHeight: 1, fontWeight: 700, color: 'var(--text-main)' }}>←</span>
         </motion.button>
@@ -108,7 +111,7 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
             Pilih Kursi
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 15, marginTop: 4 }}>
-            {schedule.agencyName} — {schedule.busName}
+            {schedule.agencyName} · Bisa pilih lebih dari 1 kursi
           </p>
         </div>
       </div>
@@ -120,7 +123,7 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
           borderRadius: 'var(--radius-xl)',
           padding: 36,
           border: '1px solid var(--border-subtle)',
-          boxShadow: 'var(--shadow-md)'
+          boxShadow: 'var(--shadow-md)',
         }}>
           {/* Legend */}
           <div style={{ display: 'flex', gap: 28, marginBottom: 32, paddingBottom: 24, borderBottom: '1px solid var(--border-subtle)', justifyContent: 'center' }}>
@@ -130,10 +133,7 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
               { label: 'Terisi', color: 'var(--bg-subtle)', border: 'var(--border-subtle)' },
             ].map((l) => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 'var(--radius)',
-                  background: l.color, border: `2px solid ${l.border}`,
-                }} />
+                <div style={{ width: 28, height: 28, borderRadius: 'var(--radius)', background: l.color, border: `2px solid ${l.border}` }} />
                 <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 600 }}>{l.label}</span>
               </div>
             ))}
@@ -166,11 +166,8 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
               <div key={ri} style={{ display: 'flex', gap: 12 }}>
                 {row.map((seat, si) => (
                   <motion.div key={seat.id} style={{ display: 'flex' }}>
-                    {/* Aisle gap between column B and C */}
-                    {si === 2 && (
-                      <div style={{ width: 44 }} />
-                    )}
-                      <motion.button
+                    {si === 2 && <div style={{ width: 44 }} />}
+                    <motion.button
                       variants={seatPop}
                       initial="idle"
                       whileHover={seat.status !== 'booked' ? { scale: 1.05 } : undefined}
@@ -179,15 +176,10 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
                       onClick={() => handleSeatClick(seat)}
                       disabled={seat.status === 'booked'}
                       style={{
-                        width: 56,
-                        height: 56,
+                        width: 56, height: 56,
                         borderRadius: 'var(--radius)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: 14,
-                        fontFamily: 'inherit',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                         ...seatStyle(seat.status),
                       }}
@@ -201,15 +193,15 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
           </motion.div>
         </div>
 
-        {/* ── Sidebar Summary ── */}
+        {/* ── Sidebar ── */}
         <div style={{ position: 'sticky', top: 'calc(var(--header-h) + 32px)', display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Trip Info Card */}
+          {/* Trip Info */}
           <div style={{
             background: 'var(--bg-white)',
             borderRadius: 'var(--radius-xl)',
             padding: 32,
             border: '1px solid var(--border-subtle)',
-            boxShadow: 'var(--shadow-md)'
+            boxShadow: 'var(--shadow-md)',
           }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)', marginBottom: 24, fontFamily: 'Outfit' }}>
               Detail Perjalanan
@@ -221,6 +213,7 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
                 { label: 'Waktu', value: `${schedule.departureTime} – ${schedule.arrivalTime}` },
                 { label: 'Kelas', value: schedule.busClass },
                 { label: 'Kursi Tersedia', value: `${available} dari ${schedule.totalSeats}` },
+                { label: 'Harga / Kursi', value: formatPrice(schedule.price) },
               ].map((item) => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{item.label}</span>
@@ -230,9 +223,9 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
             </div>
           </div>
 
-          {/* Selected Seat */}
+          {/* Selected Seats Summary */}
           <AnimatePresence mode="wait">
-            {selectedSeat ? (
+            {selectedSeats.size > 0 ? (
               <motion.div
                 key="selected"
                 variants={scaleIn}
@@ -240,35 +233,61 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
                 animate="visible"
                 exit="exit"
                 style={{
-                  padding: 32,
-                  borderRadius: 'var(--radius-xl)',
+                  padding: 32, borderRadius: 'var(--radius-xl)',
                   border: '2px solid var(--primary)',
                   background: 'var(--bg-white)',
-                  boxShadow: 'var(--shadow-lg)'
+                  boxShadow: 'var(--shadow-lg)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}>Kursi Dipilih</span>
-                  <span style={{
-                    padding: '8px 20px', borderRadius: 'var(--radius-full)',
-                    background: 'var(--grad-primary)',
-                    color: '#fff', fontWeight: 800, fontSize: 16, fontFamily: 'Outfit'
-                  }}>
-                    {selectedSeat}
-                  </span>
+                {/* Kursi terpilih */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>
+                    Kursi Dipilih ({selectedSeats.size})
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {selectedList.map((s) => (
+                      <motion.span
+                        key={s}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 'var(--radius-full)',
+                          background: 'var(--grad-primary)',
+                          color: '#fff',
+                          fontWeight: 800,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        }}
+                      >
+                        {s}
+                      </motion.span>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
-                  <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>Total Harga</span>
-                  <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
-                    {formatPrice(schedule.price)}
-                  </span>
+
+                {/* Rincian harga */}
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, marginBottom: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                      {formatPrice(schedule.price)} × {selectedSeats.size} kursi
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>Total</span>
+                    <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
+                      {formatPrice(totalPrice)}
+                    </span>
+                  </div>
                 </div>
+
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   className="btn btn-primary btn-lg"
                   style={{ width: '100%', padding: '16px 24px', fontSize: 16 }}
-                  onClick={() => onConfirm(selectedSeat)}
+                  onClick={() => onConfirm(selectedList)}
                 >
                   Lanjut Pembayaran
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -289,11 +308,14 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
                   background: 'var(--bg-white)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 'var(--radius-xl)',
-                  boxShadow: 'var(--shadow-sm)'
+                  boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 8 }}>
                   Pilih kursi untuk melanjutkan
+                </p>
+                <p style={{ color: 'var(--text-light)', fontSize: 13 }}>
+                  Kamu bisa pilih lebih dari satu kursi
                 </p>
               </motion.div>
             )}

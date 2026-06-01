@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shader, ChromaFlow, Swirl } from "shaders/react";
 import { useAppStore } from "@/store/AppContext";
@@ -163,6 +163,7 @@ function useReveal(threshold = 0.3) {
 /* ─── Landing Page ─── */
 export default function LandingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAppStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const shaderContainerRef = useRef<HTMLDivElement>(null);
@@ -208,12 +209,21 @@ export default function LandingPage() {
     }
   }, [user, router]);
 
+
   const scrollToSection = useCallback((index: number) => {
     if (!scrollRef.current) return;
     const w = scrollRef.current.offsetWidth;
     scrollRef.current.scrollTo({ left: w * index, behavior: "smooth" });
     setCurrentSection(index);
   }, []);
+
+  // Jika diarahkan dari halaman home tanpa login (?login=1), scroll ke section Masuk
+  useEffect(() => {
+    if (searchParams.get("login") === "1" && isLoaded) {
+      setAuthMode("login");
+      scrollToSection(4);
+    }
+  }, [searchParams, isLoaded, scrollToSection]);
 
   /* Vertical wheel → horizontal scroll */
   useEffect(() => {
@@ -593,7 +603,7 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
   const router = useRouter();
   const { ref, isVisible } = useReveal(0.3);
   const { login, register } = useAppStore();
-  const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "customer" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isLogin = mode === "login";
@@ -601,7 +611,7 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
   const switchMode = () => {
     onModeChange(isLogin ? "register" : "login");
     setError("");
-    setFormData({ name: "", email: "", password: "", role: "customer" });
+    setFormData({ name: "", email: "", password: "" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -628,11 +638,11 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
         setIsSubmitting(false);
         return;
       }
-      ok = await register(formData.name.trim(), formData.email, formData.password, formData.role);
+      ok = await register(formData.name.trim(), formData.email, formData.password, "customer");
       if (!ok) {
         setError("Email sudah terdaftar atau terjadi kesalahan.");
       } else {
-        loggedInUser = { role: formData.role };
+        loggedInUser = { role: "customer" };
       }
     }
 
@@ -656,7 +666,7 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
             <div className="lp-contact-info">
               <div className={`lp-contact-item lp-anim-base ${isVisible ? "revealed" : "hidden-left"}`} style={{ transitionDelay: "200ms" }}>
                 <div className="lp-contact-label">Portal Customer</div>
-                <p>{isLogin ? "Masuk untuk lanjut ke menu customer" : "Daftar akun untuk mulai memesan tiket"}</p>
+                <p>{isLogin ? "Masuk untuk lanjut ke menu customer" : "Daftar akun untuk mulai memesan tiket bus"}</p>
               </div>
             </div>
           </div>
@@ -681,15 +691,6 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
                 <input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required className="lp-form-input" placeholder="••••••••" autoComplete="new-password" />
               </div>
 
-              {!isLogin && (
-                <div className="lp-form-group">
-                  <label className="lp-form-label">Daftar Sebagai</label>
-                  <select value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} className="lp-form-input">
-                    <option value="customer">Customer</option>
-                    <option value="provider">Penyedia Bus</option>
-                  </select>
-                </div>
-              )}
 
               {error && <p className="lp-form-error">{error}</p>}
 

@@ -12,9 +12,7 @@ export default function SeatPage() {
   const { selectedSchedule, setSelectedSeat } = useAppStore();
 
   useEffect(() => {
-    if (!selectedSchedule) {
-      router.replace('/home');
-    }
+    if (!selectedSchedule) router.replace('/home');
   }, [selectedSchedule, router]);
 
   if (!selectedSchedule) return null;
@@ -24,8 +22,8 @@ export default function SeatPage() {
       <PageTransition pageKey="seat">
         <SeatSelection
           schedule={selectedSchedule}
-          onConfirm={(seatId) => {
-            setSelectedSeat(seatId);
+          onConfirm={(seatIds) => {
+            setSelectedSeat(seatIds.join(','));
             router.push('/booking/payment');
           }}
           onBack={() => router.push('/home')}

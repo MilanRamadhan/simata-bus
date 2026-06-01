@@ -17,6 +17,7 @@ export interface TravelAgency {
   rating: number;
   totalBuses: number;
   routes: string[];
+  ownerId?: string; // User.id dari provider yang memiliki agency ini
 }
 
 export interface BusSchedule {

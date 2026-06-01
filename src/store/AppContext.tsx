@@ -2,13 +2,15 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
-import type { User, TravelAgency, BusSchedule, Ticket } from "../types";
+import type { User, TravelAgency, BusSchedule, Ticket, Review } from "../types";
 
 interface AppState {
   user: User | null;
   agencies: TravelAgency[];
   schedules: BusSchedule[];
   tickets: Ticket[];
+  myAgency: TravelAgency | null;
+  userReviews: Review[]; // review yang sudah dikirim user yang login
   login: (email: string, password: string, role: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, role?: string) => Promise<boolean>;
   logout: () => void;
@@ -20,7 +22,7 @@ interface AppState {
   deleteSchedule: (id: string) => void;
   bookTicket: (t: Omit<Ticket, "id" | "bookingDate">) => void;
   bookSeat: (scheduleId: string, seatId: string) => void;
-  addReview: (review: { agencyId: string; rating: number; comment?: string; photos?: string }) => Promise<void>;
+  addReview: (review: { agencyId: string; rating: number; comment?: string; photos?: string }) => Promise<{ ok: boolean; error?: string }>;
   selectedSchedule: BusSchedule | null;
   selectedSeat: string;
   setSelectedSchedule: (s: BusSchedule | null) => void;
@@ -28,6 +30,24 @@ interface AppState {
 }
 
 const AppContext = createContext<AppState | null>(null);
+
+function parseRoutes(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+    // double-encoded: JSON.parse lagi
+    if (typeof parsed === "string") {
+      const inner = JSON.parse(parsed);
+      if (Array.isArray(inner)) return inner.map(String);
+    }
+    return [String(parsed)];
+  } catch {
+    // fallback: comma-separated plain string
+    return raw.split(",").map((r) => r.trim()).filter(Boolean);
+  }
+}
 
 export function useAppStore() {
   const ctx = useContext(AppContext);
@@ -40,8 +60,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [agencies, setAgencies] = useState<TravelAgency[]>([]);
   const [schedules, setSchedules] = useState<BusSchedule[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<BusSchedule | null>(null);
   const [selectedSeat, setSelectedSeat] = useState("");
+
+  // Agency milik provider yang sedang login (null untuk admin/customer)
+  const myAgency = user?.role === "provider"
+    ? (agencies.find((a) => a.ownerId === user.id) ?? null)
+    : null;
 
   const fetchAll = useCallback(async () => {
     try {
@@ -50,7 +76,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const sch = resS.ok ? await resS.json() : [];
       const tkt = resT.ok ? await resT.json() : [];
 
-      setAgencies(Array.isArray(agg) ? agg.map((a: any) => ({ ...a, routes: JSON.parse(a.routes || "[]") })) : []);
+      setAgencies(Array.isArray(agg) ? agg.map((a: any) => ({ ...a, routes: parseRoutes(a.routes) })) : []);
       setSchedules(Array.isArray(sch) ? sch.map((s: any) => ({ ...s, bookedSeats: JSON.parse(s.bookedSeats || "[]") })) : []);
       setTickets(Array.isArray(tkt) ? tkt : []);
     } catch (e) {
@@ -61,6 +87,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    if (!user) { setUserReviews([]); return; }
+    fetch(`/api/reviews?userId=${user.id}`)
+      .then((r) => r.json())
+      .then((data) => setUserReviews(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string, role: string): Promise<boolean> => {
     try {
@@ -110,7 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     if (res.ok) {
       const saved = await res.json();
-      setAgencies((prev) => [{ ...saved, routes: JSON.parse(saved.routes) }, ...prev]);
+      setAgencies((prev) => [{ ...saved, routes: parseRoutes(saved.routes) }, ...prev]);
     }
   }, []);
 
@@ -161,10 +195,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const bookSeat = useCallback(
-    async (scheduleId: string, seatId: string) => {
+    async (scheduleId: string, seatIds: string | string[]) => {
       const sched = schedules.find((s) => s.id === scheduleId);
       if (!sched) return;
-      const newSeats = [...sched.bookedSeats, seatId];
+      const ids = Array.isArray(seatIds) ? seatIds : seatIds.split(",").filter(Boolean);
+      const newSeats = [...sched.bookedSeats, ...ids];
       setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? { ...s, bookedSeats: newSeats } : s)));
       await fetch(`/api/schedules/${scheduleId}`, {
         method: "PUT",
@@ -186,13 +221,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addReview = useCallback(
-    async (review: { agencyId: string; rating: number; comment?: string; photos?: string }) => {
-      if (!user) return;
-      await fetch("/api/reviews", {
+    async (review: { agencyId: string; rating: number; comment?: string; photos?: string }): Promise<{ ok: boolean; error?: string }> => {
+      if (!user) return { ok: false, error: "Tidak terautentikasi." };
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...review, userId: user.id }),
       });
+      if (res.ok) {
+        const saved = await res.json();
+        setUserReviews((prev) => [saved, ...prev]);
+        return { ok: true };
+      }
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data.error || "Gagal mengirim ulasan." };
     },
     [user],
   );
@@ -204,6 +246,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         agencies,
         schedules,
         tickets,
+        myAgency,
+        userReviews,
         login,
         register,
         logout,

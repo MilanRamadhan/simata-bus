@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/AppContext";
 import type { BusSchedule, TravelAgency } from "@/types";
+import { SUMATERA_CITIES } from "@/lib/cities";
 
 interface Props {
   onSelectSchedule: (s: BusSchedule) => void;
@@ -45,7 +46,22 @@ function TicketCard({ schedule, agency, onSelect }: { schedule: BusSchedule; age
     <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }} className="hc-ticket-card">
       <div className="hc-ticket-left">
         <div className="hc-bus-info">
-          <div className="hc-bus-logo">{agency?.logo || "🚌"}</div>
+          <div className="hc-bus-logo">
+          {agency?.photos ? (
+            <img
+              src={agency.photos}
+              alt={agency.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const parent = e.currentTarget.parentElement;
+                if (parent) parent.textContent = agency?.logo || "🚌";
+              }}
+            />
+          ) : (
+            agency?.logo || "🚌"
+          )}
+        </div>
           <div className="hc-bus-name">
             <h3>{schedule.agencyName}</h3>
             <p>{schedule.busClass}</p>
@@ -99,6 +115,9 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
   const [date, setDate] = useState("");
   const [searched, setSearched] = useState(false);
   const [priceSort, setPriceSort] = useState<"asc" | "desc" | "">("");
+  const [classFilter, setClassFilter] = useState<"" | "Ekonomi" | "Bisnis" | "Eksekutif">("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
   const agencyMap = useMemo(() => {
     const map: Record<string, TravelAgency> = {};
@@ -112,8 +131,8 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
     let result = schedules;
     if (searched) {
       result = schedules.filter((item) => {
-        const matchOrigin = item.origin.toLowerCase().includes(origin.toLowerCase());
-        const matchDest = item.destination.toLowerCase().includes(destination.toLowerCase());
+        const matchOrigin = !origin || item.origin === origin;
+        const matchDest = !destination || item.destination === destination;
 
         let matchDate = false;
         if (!date) {
@@ -132,6 +151,17 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
       });
     }
 
+    if (classFilter) {
+      result = result.filter((item) => item.busClass === classFilter);
+    }
+
+    if (minPrice) {
+      result = result.filter((item) => item.price >= parseInt(minPrice));
+    }
+    if (maxPrice) {
+      result = result.filter((item) => item.price <= parseInt(maxPrice));
+    }
+
     if (priceSort === "asc") {
       result = [...result].sort((a, b) => a.price - b.price);
     } else if (priceSort === "desc") {
@@ -139,7 +169,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
     }
 
     return result;
-  }, [searched, schedules, origin, destination, date, priceSort]);
+  }, [searched, schedules, origin, destination, date, priceSort, classFilter, minPrice, maxPrice]);
 
   const doSearch = () => setSearched(true);
 
@@ -148,6 +178,10 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
     setOrigin("");
     setDestination("");
     setDate("");
+    setClassFilter("");
+    setMinPrice("");
+    setMaxPrice("");
+    setPriceSort("");
   };
 
   return (
@@ -160,12 +194,26 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
       <div className="hc-search-wrapper">
         <div className="hc-search-field">
           <label>Keberangkatan</label>
-          <input type="text" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Cth: Banda Aceh" />
+          <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="hc-city-select">
+            <option value="">Pilih kota asal...</option>
+            {SUMATERA_CITIES.map((p) => (
+              <optgroup key={p.province} label={p.province}>
+                {p.cities.map((c) => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+            ))}
+          </select>
         </div>
 
         <div className="hc-search-field">
           <label>Tujuan</label>
-          <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Cth: Lhokseumawe" />
+          <select value={destination} onChange={(e) => setDestination(e.target.value)} className="hc-city-select">
+            <option value="">Pilih kota tujuan...</option>
+            {SUMATERA_CITIES.map((p) => (
+              <optgroup key={p.province} label={p.province}>
+                {p.cities.map((c) => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+            ))}
+          </select>
         </div>
 
         <div className="hc-search-field">
@@ -179,11 +227,35 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
       </div>
 
       <div className="hc-filter-bar">
+        <div className="hc-filter-label">Filter:</div>
+        <select value={classFilter} onChange={(e) => setClassFilter(e.target.value as typeof classFilter)} className="hc-select-filter">
+          <option value="">Semua Kelas</option>
+          <option value="Ekonomi">Ekonomi</option>
+          <option value="Bisnis">Bisnis</option>
+          <option value="Eksekutif">Eksekutif</option>
+        </select>
         <select value={priceSort} onChange={(e) => setPriceSort(e.target.value as "asc" | "desc" | "")} className="hc-select-filter">
           <option value="">Urutkan Harga</option>
           <option value="asc">Harga Terendah</option>
           <option value="desc">Harga Tertinggi</option>
         </select>
+        <div className="hc-price-range">
+          <input
+            type="number"
+            placeholder="Harga min"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            className="hc-price-input"
+          />
+          <span className="hc-price-sep">–</span>
+          <input
+            type="number"
+            placeholder="Harga max"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            className="hc-price-input"
+          />
+        </div>
       </div>
 
       <main className="hc-main-container">
@@ -243,18 +315,59 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           max-width: 1000px;
           margin: 16px auto 0;
           display: flex;
-          justify-content: flex-end;
+          align-items: center;
+          gap: 10px;
           padding: 0 12px;
+          flex-wrap: wrap;
+        }
+
+        .hc-filter-label {
+          font-size: 13px;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-right: 4px;
         }
 
         .hc-select-filter {
-          padding: 8px 16px;
+          padding: 8px 14px;
           border-radius: 8px;
           border: 1px solid #e2e8f0;
           font-family: inherit;
           font-size: 14px;
           background-color: white;
           cursor: pointer;
+          color: #0f172a;
+        }
+
+        .hc-price-range {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 4px 12px;
+        }
+
+        .hc-price-input {
+          border: none;
+          outline: none;
+          font-family: inherit;
+          font-size: 14px;
+          color: #0f172a;
+          width: 110px;
+          background: transparent;
+        }
+
+        .hc-price-input::placeholder {
+          color: #cbd5e1;
+        }
+
+        .hc-price-sep {
+          color: #94a3b8;
+          font-weight: 600;
         }
 
         .hc-search-wrapper {
@@ -292,15 +405,26 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           letter-spacing: 0.5px;
         }
 
-        .hc-search-field input {
+        .hc-search-field input,
+        .hc-city-select {
           border: none;
           outline: none;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           color: #0f172a;
           font-family: inherit;
           background: transparent;
           width: 100%;
+          cursor: pointer;
+          appearance: none;
+          -webkit-appearance: none;
+        }
+
+        .hc-city-select option,
+        .hc-city-select optgroup {
+          font-weight: 500;
+          color: #0f172a;
+          background: #fff;
         }
 
         .hc-search-field input::placeholder {

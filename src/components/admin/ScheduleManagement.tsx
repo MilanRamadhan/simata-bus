@@ -5,6 +5,40 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/AppContext";
 import { fadeSlideUp, staggerContainer, staggerItem, scaleIn } from "@/animations/variants";
 import type { BusSchedule } from "@/types";
+import { SUMATERA_CITIES } from "@/lib/cities";
+
+function IconEdit() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+    </svg>
+  );
+}
+
+function IconList() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  );
+}
 
 function formatPrice(n: number) {
   return "Rp " + n.toLocaleString("id-ID");
@@ -13,7 +47,7 @@ function formatPrice(n: number) {
 const EMPTY_FORM: Omit<BusSchedule, "id"> = {
   agencyId: "",
   agencyName: "",
-  busName: "",
+  busName: "",        // diisi otomatis = agencyName
   origin: "",
   destination: "",
   date: "",
@@ -27,8 +61,41 @@ const EMPTY_FORM: Omit<BusSchedule, "id"> = {
   recurringDays: "",
 };
 
+/* Dropdown kota Sumatera */
+function CitySelect({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <select className="form-input" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Pilih kota...</option>
+        {SUMATERA_CITIES.map((p) => (
+          <optgroup key={p.province} label={p.province}>
+            {p.cities.map((c) => <option key={c} value={c}>{c}</option>)}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function ScheduleManagement() {
-  const { schedules, agencies, addSchedule, updateSchedule, deleteSchedule, tickets } = useAppStore();
+  const { schedules, agencies, addSchedule, updateSchedule, deleteSchedule, tickets, user, myAgency } = useAppStore();
+  const isProvider = user?.role === "provider";
+
+  // Provider hanya lihat jadwal agency-nya sendiri
+  const visibleSchedules = useMemo(() => {
+    if (!isProvider) return schedules;          // admin → semua
+    if (!myAgency) return [];                   // provider tanpa agency → kosong
+    return schedules.filter((s) => s.agencyId === myAgency.id);
+  }, [isProvider, myAgency, schedules]);
+
+  // Provider hanya bisa pilih agency sendiri di dropdown
+  const availableAgencies = useMemo(() => {
+    if (!isProvider) return agencies;           // admin → semua agency
+    if (!myAgency) return [];                   // provider tanpa agency → kosong
+    return [myAgency];
+  }, [isProvider, myAgency, agencies]);
+
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<BusSchedule, "id">>(EMPTY_FORM);
@@ -37,7 +104,12 @@ export default function ScheduleManagement() {
 
   const openAdd = () => {
     setEditId(null);
-    setForm(EMPTY_FORM);
+    // Provider: pre-fill agency mereka
+    if (isProvider && myAgency) {
+      setForm({ ...EMPTY_FORM, agencyId: myAgency.id, agencyName: myAgency.name });
+    } else {
+      setForm(EMPTY_FORM);
+    }
     setShowModal(true);
   };
   const openEdit = (s: BusSchedule) => {
@@ -62,8 +134,9 @@ export default function ScheduleManagement() {
   };
 
   const handleSave = () => {
-    const ag = agencies.find((a) => a.id === form.agencyId);
-    const updated = { ...form, agencyName: ag?.name || form.agencyName };
+    const ag = availableAgencies.find((a) => a.id === form.agencyId);
+    const agencyName = ag?.name || form.agencyName;
+    const updated = { ...form, agencyName, busName: agencyName }; // busName = agencyName
     if (editId) {
       updateSchedule({ ...updated, id: editId });
     } else {
@@ -81,18 +154,22 @@ export default function ScheduleManagement() {
 
   const manifestTickets = useMemo(() => {
     if (!manifestId) return [];
-    const sc = schedules.find((s) => s.id === manifestId);
+    const sc = visibleSchedules.find((s) => s.id === manifestId);
     if (!sc) return [];
     return tickets.filter((t) => t.agencyName === sc.agencyName && t.busName === sc.busName && t.date === sc.date);
-  }, [manifestId, schedules, tickets]);
+  }, [manifestId, visibleSchedules, tickets]);
 
   return (
     <motion.div variants={fadeSlideUp} initial="hidden" animate="visible">
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 36 }}>
         <div>
-          <h1 style={{ fontSize: 32, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.02em", fontFamily: "Outfit" }}>Jadwal Bus</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 16, marginTop: 4 }}>Kelola jadwal keberangkatan dan armada</p>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.02em", fontFamily: "Outfit" }}>
+            {isProvider ? "Jadwal Saya" : "Jadwal Bus"}
+          </h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 16, marginTop: 4 }}>
+            {isProvider ? `Jadwal keberangkatan armada ${myAgency?.name || "Anda"}` : "Kelola jadwal keberangkatan dan armada"}
+          </p>
         </div>
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="btn btn-primary btn-lg" onClick={openAdd} style={{ gap: 10, padding: "12px 24px", fontSize: 15 }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -129,7 +206,15 @@ export default function ScheduleManagement() {
             </tr>
           </thead>
           <motion.tbody variants={staggerContainer} initial="hidden" animate="visible">
-            {schedules.map((s) => {
+            {visibleSchedules.length === 0 && (
+              <tr>
+                <td colSpan={10} style={{ padding: "60px 24px", textAlign: "center", color: "var(--text-muted)" }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
+                  <p>{isProvider && !myAgency ? "Atur profil armada Anda terlebih dahulu." : "Belum ada jadwal. Klik \"Tambah Jadwal\" untuk memulai."}</p>
+                </td>
+              </tr>
+            )}
+            {visibleSchedules.map((s) => {
               const avail = s.totalSeats - s.bookedSeats.length;
               return (
                 <motion.tr
@@ -172,45 +257,38 @@ export default function ScheduleManagement() {
                   <td style={{ fontWeight: 800, color: "var(--text-main)", padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>{formatPrice(s.price)}</td>
                   <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
                     <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                       className="btn btn-ghost"
                       onClick={() => setManifestId(s.id)}
-                      title="Manifest"
-                      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, margin: "0 auto", padding: "8px", height: "auto" }}
+                      title="Manifest Penumpang"
+                      style={{ margin: "0 auto", padding: "8px", height: "auto" }}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
+                      <IconList />
                     </motion.button>
                   </td>
                   <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
                     <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                       className="btn btn-ghost"
                       onClick={() => openEdit(s)}
-                      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, margin: "0 auto", padding: "8px", height: "auto" }}
+                      title="Edit Jadwal"
+                      style={{ margin: "0 auto", padding: "8px", height: "auto" }}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
+                      <IconEdit />
                     </motion.button>
                   </td>
                   <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
                     <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                       className="btn btn-ghost"
                       onClick={() => setShowDelete(s.id)}
-                      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, margin: "0 auto", padding: "8px", height: "auto" }}
+                      title="Hapus Jadwal"
+                      style={{ margin: "0 auto", padding: "8px", height: "auto" }}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
+                      <IconTrash />
                     </motion.button>
                   </td>
                 </motion.tr>
@@ -237,26 +315,16 @@ export default function ScheduleManagement() {
                   }}
                 >
                   <option value="">Pilih agency</option>
-                  {agencies.map((a) => (
+                  {availableAgencies.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
                     </option>
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label">Nama Bus</label>
-                <input className="form-input" value={form.busName} onChange={(e) => setForm((f) => ({ ...f, busName: e.target.value }))} placeholder="SJ Express" />
-              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                <div className="form-group">
-                  <label className="form-label">Kota Asal</label>
-                  <input className="form-input" value={form.origin} onChange={(e) => setForm((f) => ({ ...f, origin: e.target.value }))} placeholder="Jakarta" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Kota Tujuan</label>
-                  <input className="form-input" value={form.destination} onChange={(e) => setForm((f) => ({ ...f, destination: e.target.value }))} placeholder="Semarang" />
-                </div>
+                <CitySelect label="Kota Asal" value={form.origin} onChange={(v) => setForm((f) => ({ ...f, origin: v }))} />
+                <CitySelect label="Kota Tujuan" value={form.destination} onChange={(v) => setForm((f) => ({ ...f, destination: v }))} />
               </div>
               <div style={{ padding: "16px", background: "#f8fafc", borderRadius: "8px", marginBottom: "20px" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>
@@ -386,7 +454,7 @@ export default function ScheduleManagement() {
           <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setManifestId(null)}>
             <motion.div variants={scaleIn} initial="hidden" animate="visible" exit="exit" className="modal-content" style={{ maxWidth: 680, padding: 36 }} onClick={(e) => e.stopPropagation()}>
               {(() => {
-                const sc = schedules.find((s) => s.id === manifestId);
+                const sc = visibleSchedules.find((s) => s.id === manifestId);
                 return (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>

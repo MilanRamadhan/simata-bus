@@ -13,7 +13,7 @@ export default function HomePage() {
 
   const handleSelectSchedule = (s: BusSchedule) => {
     if (!user) {
-      router.push("/");
+      router.push("/?login=1");
       return;
     }
     setSelectedSchedule(s);

@@ -29,6 +29,7 @@ model TravelAgency {
   rating      Float
   totalBuses  Int
   routes      String   // Stored as JSON string
+  ownerId     String?  // User.id dari penyedia bus (provider) yang memiliki agency ini
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   schedules   BusSchedule[]

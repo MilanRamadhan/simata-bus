@@ -12,15 +12,16 @@ export default function PaymentPage() {
   const router = useRouter();
   const { user, selectedSchedule, selectedSeat, bookTicket, bookSeat, setSelectedSchedule, setSelectedSeat } = useAppStore();
 
+  const seatIds = selectedSeat ? selectedSeat.split(',').filter(Boolean) : [];
+
   useEffect(() => {
-    if (!selectedSchedule || !selectedSeat) {
-      router.replace('/home');
-    }
-  }, [selectedSchedule, selectedSeat, router]);
+    if (!selectedSchedule || seatIds.length === 0) router.replace('/home');
+  }, [selectedSchedule, seatIds.length, router]);
 
   const handleConfirm = useCallback((passenger: PassengerData, method: PaymentMethod) => {
-    if (!selectedSchedule || !user) return;
-    bookSeat(selectedSchedule.id, selectedSeat);
+    if (!selectedSchedule || !user || seatIds.length === 0) return;
+
+    bookSeat(selectedSchedule.id, seatIds);
     bookTicket({
       passengerId: user.id,
       passengerName: passenger.fullName,
@@ -34,24 +35,25 @@ export default function PaymentPage() {
       date: selectedSchedule.date,
       departureTime: selectedSchedule.departureTime,
       arrivalTime: selectedSchedule.arrivalTime,
-      seatNumber: selectedSeat,
-      price: selectedSchedule.price,
+      seatNumber: seatIds.join(', '),
+      price: selectedSchedule.price * seatIds.length,
       paymentMethod: method,
       status: 'Lunas',
     });
+
     setSelectedSchedule(null);
     setSelectedSeat('');
     router.push('/history');
-  }, [selectedSchedule, selectedSeat, user, bookTicket, bookSeat, setSelectedSchedule, setSelectedSeat, router]);
+  }, [selectedSchedule, seatIds, user, bookTicket, bookSeat, setSelectedSchedule, setSelectedSeat, router]);
 
-  if (!selectedSchedule || !selectedSeat) return null;
+  if (!selectedSchedule || seatIds.length === 0) return null;
 
   return (
     <AnimatePresence mode="wait">
       <PageTransition pageKey="payment">
         <PassengerPayment
           schedule={selectedSchedule}
-          seatId={selectedSeat}
+          seatIds={seatIds}
           onConfirm={handleConfirm}
           onBack={() => router.push('/booking/seat')}
         />

@@ -7,7 +7,7 @@ import type { BusSchedule, PassengerData, PaymentMethod } from '@/types';
 
 interface Props {
   schedule: BusSchedule;
-  seatId: string;
+  seatIds: string[];
   onConfirm: (passenger: PassengerData, payment: PaymentMethod) => void;
   onBack: () => void;
 }
@@ -22,7 +22,8 @@ const PAYMENT_METHODS: { method: PaymentMethod; icon: string; desc: string }[] =
   { method: 'E-Wallet', icon: '💳', desc: 'GoPay, OVO, DANA, ShopeePay' },
 ];
 
-export default function PassengerPayment({ schedule, seatId, onConfirm, onBack }: Props) {
+export default function PassengerPayment({ schedule, seatIds, onConfirm, onBack }: Props) {
+  const totalPrice = schedule.price * seatIds.length;
   const [passenger, setPassenger] = useState<PassengerData>({
     fullName: '',
     nik: '',
@@ -280,25 +281,43 @@ export default function PassengerPayment({ schedule, seatId, onConfirm, onBack }
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
-                { label: 'Bus', value: `${schedule.agencyName} — ${schedule.busName}` },
+                { label: 'Bus', value: schedule.agencyName },
                 { label: 'Rute', value: `${schedule.origin} → ${schedule.destination}` },
                 { label: 'Tanggal', value: schedule.date },
                 { label: 'Waktu', value: `${schedule.departureTime} – ${schedule.arrivalTime}` },
                 { label: 'Kelas', value: schedule.busClass },
-                { label: 'Kursi', value: seatId },
               ].map((item) => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{item.label}</span>
                   <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-main)', textAlign: 'right', maxWidth: '60%' }}>{item.value}</span>
                 </div>
               ))}
+
+              {/* Daftar kursi */}
+              <div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  Kursi ({seatIds.length})
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {seatIds.map((s) => (
+                    <span key={s} style={{ padding: '4px 12px', borderRadius: 'var(--radius-full)', background: 'var(--primary-light)', color: 'var(--primary-dark)', fontWeight: 700, fontSize: 13 }}>
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
             <hr className="divider" style={{ margin: '24px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-muted)' }}>Total Pembayaran</span>
-              <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
-                {formatPrice(schedule.price)}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{formatPrice(schedule.price)} × {seatIds.length} kursi</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-muted)' }}>Total Pembayaran</span>
+                <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
+                  {formatPrice(totalPrice)}
+                </span>
+              </div>
             </div>
           </div>
 
