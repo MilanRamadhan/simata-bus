@@ -5,7 +5,7 @@ erDiagram
         string id PK "Unique identifier"
         string name "Nama Lengkap"
         string email "Alamat Email"
-        string role "admin | customer"
+        string role "admin | customer | provider"
     }
 
     TRAVEL_AGENCY {
@@ -13,9 +13,20 @@ erDiagram
         string name "Nama PO / Agency"
         string logo "Icon Emoji Agency"
         string description "Deskripsi Singkat"
+        string contact "Kontak Agency"
+        string photos "URL Foto Bus / Agency"
         float rating "Nilai Rating (ex: 4.5)"
         int totalBuses "Jumlah Bus"
         string[] routes "Daftar rute yang dilayani"
+    }
+
+    REVIEW {
+        string id PK "Unique identifier"
+        string userId FK "Relasi ke USER"
+        string agencyId FK "Relasi ke TRAVEL_AGENCY"
+        int rating "Nilai Rating (1-5)"
+        string comment "Komentar (Opsional)"
+        string photos "URL Foto dari User (Opsional)"
     }
 
     BUS_SCHEDULE {
@@ -32,6 +43,8 @@ erDiagram
         int totalSeats "Kapasitas Kursi"
         string[] bookedSeats "Array ID Kursi yang dipesan"
         string busClass "Ekonomi | Bisnis | Eksekutif"
+        boolean isRecurring "Apakah jadwal berulang"
+        string recurringDays "Hari berulang (ex: Monday,Tuesday)"
     }
 
     TICKET {

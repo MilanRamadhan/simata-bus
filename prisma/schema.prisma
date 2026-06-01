@@ -12,8 +12,9 @@ model User {
   email     String   @unique
   password  String
   name      String
-  role      String   @default("customer") // "admin" | "customer"
+  role      String   @default("customer") // "admin" | "customer" | "provider"
   tickets   Ticket[]
+  reviews   Review[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -23,12 +24,27 @@ model TravelAgency {
   name        String
   logo        String
   description String
+  contact     String?  // Kontak agency
+  photos      String?  // URL foto bus/agency
   rating      Float
   totalBuses  Int
   routes      String   // Stored as JSON string
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   schedules   BusSchedule[]
+  reviews     Review[]
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agencyId  String
+  agency    TravelAgency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  photos    String?      // Foto opsional dari user
+  createdAt DateTime     @default(now())
 }
 
 model BusSchedule {
@@ -46,6 +62,8 @@ model BusSchedule {
   totalSeats    Int
   bookedSeats   String   // Stored as JSON string []
   busClass      String
+  isRecurring   Boolean  @default(false)
+  recurringDays String?  // e.g., "Monday,Tuesday,Wednesday"
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

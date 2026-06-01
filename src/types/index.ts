@@ -4,14 +4,16 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'customer';
+  role: "admin" | "customer" | "provider";
 }
 
 export interface TravelAgency {
   id: string;
   name: string;
-  logo: string;       // emoji placeholder
+  logo: string; // emoji placeholder
   description: string;
+  contact?: string;
+  photos?: string;
   rating: number;
   totalBuses: number;
   routes: string[];
@@ -30,10 +32,12 @@ export interface BusSchedule {
   price: number;
   totalSeats: number;
   bookedSeats: string[];
-  busClass: 'Ekonomi' | 'Bisnis' | 'Eksekutif';
+  busClass: "Ekonomi" | "Bisnis" | "Eksekutif";
+  isRecurring?: boolean;
+  recurringDays?: string;
 }
 
-export type SeatStatus = 'available' | 'booked' | 'selected';
+export type SeatStatus = "available" | "booked" | "selected";
 
 export interface Seat {
   id: string;
@@ -47,8 +51,8 @@ export interface PassengerData {
   email: string;
 }
 
-export type PaymentMethod = 'QRIS' | 'Virtual Account' | 'E-Wallet';
-export type TransactionStatus = 'Menunggu Pembayaran' | 'Lunas' | 'Kedaluwarsa' | 'Dibatalkan';
+export type PaymentMethod = "QRIS" | "Virtual Account" | "E-Wallet";
+export type TransactionStatus = "Menunggu Pembayaran" | "Lunas" | "Kedaluwarsa" | "Dibatalkan";
 
 export interface Ticket {
   id: string;
@@ -69,4 +73,14 @@ export interface Ticket {
   paymentMethod: PaymentMethod;
   status: TransactionStatus;
   bookingDate: string;
+}
+
+export interface Review {
+  id: string;
+  userId: string;
+  agencyId: string;
+  rating: number;
+  comment?: string;
+  photos?: string;
+  createdAt: string;
 }

@@ -1,20 +1,24 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { AnimatePresence } from 'framer-motion';
-import { useAppStore } from '@/store/AppContext';
-import PageTransition from '@/components/shared/PageTransition';
-import CustomerHome from '@/components/customer/CustomerHome';
-import type { BusSchedule } from '@/types';
+import { useRouter } from "next/navigation";
+import { AnimatePresence } from "framer-motion";
+import { useAppStore } from "@/store/AppContext";
+import PageTransition from "@/components/shared/PageTransition";
+import CustomerHome from "@/components/customer/CustomerHome";
+import type { BusSchedule } from "@/types";
 
 export default function HomePage() {
   const router = useRouter();
-  const { setSelectedSchedule, setSelectedSeat } = useAppStore();
+  const { user, setSelectedSchedule, setSelectedSeat } = useAppStore();
 
   const handleSelectSchedule = (s: BusSchedule) => {
+    if (!user) {
+      router.push("/");
+      return;
+    }
     setSelectedSchedule(s);
-    setSelectedSeat('');
-    router.push('/booking/seat');
+    setSelectedSeat("");
+    router.push("/booking/seat");
   };
 
   return (

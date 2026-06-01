@@ -1,25 +1,25 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { useAppStore } from '@/store/AppContext';
-import type { BusSchedule, TravelAgency } from '@/types';
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { useAppStore } from "@/store/AppContext";
+import type { BusSchedule, TravelAgency } from "@/types";
 
 interface Props {
   onSelectSchedule: (s: BusSchedule) => void;
 }
 
 function formatPrice(n: number) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
     minimumFractionDigits: 0,
   }).format(n);
 }
 
 function getDuration(departure: string, arrival: string) {
-  const [depHour, depMinute] = departure.split(':').map(Number);
-  const [arrHour, arrMinute] = arrival.split(':').map(Number);
+  const [depHour, depMinute] = departure.split(":").map(Number);
+  const [arrHour, arrMinute] = arrival.split(":").map(Number);
   let dep = depHour * 60 + depMinute;
   let arr = arrHour * 60 + arrMinute;
   if (arr < dep) arr += 24 * 60;
@@ -32,32 +32,20 @@ function getDuration(departure: string, arrival: string) {
 }
 
 function getFacilities(schedule: BusSchedule) {
-  if (schedule.busClass === 'Eksekutif') return ['AC', 'Toilet', 'Snack'];
-  if (schedule.busClass === 'Bisnis') return ['AC', 'Reclining Seat'];
-  return ['AC', 'USB Port'];
+  if (schedule.busClass === "Eksekutif") return ["AC", "Toilet", "Snack"];
+  if (schedule.busClass === "Bisnis") return ["AC", "Reclining Seat"];
+  return ["AC", "USB Port"];
 }
 
-function TicketCard({
-  schedule,
-  agency,
-  onSelect,
-}: {
-  schedule: BusSchedule;
-  agency?: TravelAgency;
-  onSelect: () => void;
-}) {
+function TicketCard({ schedule, agency, onSelect }: { schedule: BusSchedule; agency?: TravelAgency; onSelect: () => void }) {
   const availableSeats = schedule.totalSeats - schedule.bookedSeats.length;
   const facilities = getFacilities(schedule);
 
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
-      className="hc-ticket-card"
-    >
+    <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }} className="hc-ticket-card">
       <div className="hc-ticket-left">
         <div className="hc-bus-info">
-          <div className="hc-bus-logo">{agency?.logo || '🚌'}</div>
+          <div className="hc-bus-logo">{agency?.logo || "🚌"}</div>
           <div className="hc-bus-name">
             <h3>{schedule.agencyName}</h3>
             <p>{schedule.busClass}</p>
@@ -72,7 +60,8 @@ function TicketCard({
 
           <div className="hc-route-line">
             <div className="hc-duration">{getDuration(schedule.departureTime, schedule.arrivalTime)}</div>
-            <div className="hc-line" />
+            <div className="hc-line" />{" "}
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, textAlign: "center", position: "absolute", top: 32, width: "100%" }}>{schedule.isRecurring ? `🔄 Setiap ${schedule.recurringDays}` : schedule.date}</div>{" "}
           </div>
 
           <div className="hc-time-box">
@@ -105,10 +94,11 @@ function TicketCard({
 
 export default function CustomerHome({ onSelectSchedule }: Props) {
   const { schedules, agencies } = useAppStore();
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [date, setDate] = useState('');
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [date, setDate] = useState("");
   const [searched, setSearched] = useState(false);
+  const [priceSort, setPriceSort] = useState<"asc" | "desc" | "">("");
 
   const agencyMap = useMemo(() => {
     const map: Record<string, TravelAgency> = {};
@@ -119,54 +109,63 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
   }, [agencies]);
 
   const filtered = useMemo(() => {
-    if (!searched) return schedules;
+    let result = schedules;
+    if (searched) {
+      result = schedules.filter((item) => {
+        const matchOrigin = item.origin.toLowerCase().includes(origin.toLowerCase());
+        const matchDest = item.destination.toLowerCase().includes(destination.toLowerCase());
 
-    return schedules.filter((item) => {
-      const matchOrigin = item.origin.toLowerCase().includes(origin.toLowerCase());
-      const matchDest = item.destination.toLowerCase().includes(destination.toLowerCase());
-      const matchDate = !date || item.date === date;
-      return matchOrigin && matchDest && matchDate;
-    });
-  }, [searched, schedules, origin, destination, date]);
+        let matchDate = false;
+        if (!date) {
+          matchDate = true;
+        } else {
+          if (item.isRecurring && item.recurringDays) {
+            const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+            const searchDay = days[new Date(date).getDay()];
+            matchDate = item.recurringDays.includes(searchDay);
+          } else {
+            matchDate = item.date === date;
+          }
+        }
+
+        return matchOrigin && matchDest && matchDate;
+      });
+    }
+
+    if (priceSort === "asc") {
+      result = [...result].sort((a, b) => a.price - b.price);
+    } else if (priceSort === "desc") {
+      result = [...result].sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [searched, schedules, origin, destination, date, priceSort]);
 
   const doSearch = () => setSearched(true);
 
   const resetSearch = () => {
     setSearched(false);
-    setOrigin('');
-    setDestination('');
-    setDate('');
+    setOrigin("");
+    setDestination("");
+    setDate("");
   };
 
   return (
     <div className="hc-page">
       <section className="hc-hero">
         <h1>Jelajahi Aceh dengan Nyaman</h1>
-        <p>
-          Pesan tiket bus antarkota sekarang. Dapatkan harga terbaik dan fasilitas premium untuk
-          perjalanan kamu.
-        </p>
+        <p>Pesan tiket bus antarkota sekarang. Dapatkan harga terbaik dan fasilitas premium untuk perjalanan kamu.</p>
       </section>
 
       <div className="hc-search-wrapper">
         <div className="hc-search-field">
           <label>Keberangkatan</label>
-          <input
-            type="text"
-            value={origin}
-            onChange={(e) => setOrigin(e.target.value)}
-            placeholder="Cth: Banda Aceh"
-          />
+          <input type="text" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Cth: Banda Aceh" />
         </div>
 
         <div className="hc-search-field">
           <label>Tujuan</label>
-          <input
-            type="text"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            placeholder="Cth: Lhokseumawe"
-          />
+          <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Cth: Lhokseumawe" />
         </div>
 
         <div className="hc-search-field">
@@ -177,6 +176,14 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
         <button className="hc-btn-search" onClick={doSearch}>
           Cari Tiket
         </button>
+      </div>
+
+      <div className="hc-filter-bar">
+        <select value={priceSort} onChange={(e) => setPriceSort(e.target.value as "asc" | "desc" | "")} className="hc-select-filter">
+          <option value="">Urutkan Harga</option>
+          <option value="asc">Harga Terendah</option>
+          <option value="desc">Harga Tertinggi</option>
+        </select>
       </div>
 
       <main className="hc-main-container">
@@ -195,12 +202,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
         ) : (
           <div className="hc-ticket-list">
             {filtered.map((schedule) => (
-              <TicketCard
-                key={schedule.id}
-                schedule={schedule}
-                agency={agencyMap[schedule.agencyId]}
-                onSelect={() => onSelectSchedule(schedule)}
-              />
+              <TicketCard key={schedule.id} schedule={schedule} agency={agencyMap[schedule.agencyId]} onSelect={() => onSelectSchedule(schedule)} />
             ))}
           </div>
         )}
@@ -210,7 +212,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
         .hc-page {
           background-color: #f8fafc;
           color: #0f172a;
-          font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+          font-family: "Plus Jakarta Sans", Inter, sans-serif;
           min-height: calc(100vh - var(--header-h));
           padding-bottom: 48px;
         }
@@ -227,7 +229,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           margin-bottom: 16px;
           color: #0c4a6e;
           letter-spacing: -0.02em;
-          font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+          font-family: "Plus Jakarta Sans", Inter, sans-serif;
         }
 
         .hc-hero p {
@@ -235,6 +237,24 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           color: #64748b;
           max-width: 500px;
           margin: 0 auto;
+        }
+
+        .hc-filter-bar {
+          max-width: 1000px;
+          margin: 16px auto 0;
+          display: flex;
+          justify-content: flex-end;
+          padding: 0 12px;
+        }
+
+        .hc-select-filter {
+          padding: 8px 16px;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          font-family: inherit;
+          font-size: 14px;
+          background-color: white;
+          cursor: pointer;
         }
 
         .hc-search-wrapper {
@@ -323,7 +343,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
         .hc-section-title {
           font-size: 24px;
           font-weight: 800;
-          font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+          font-family: "Plus Jakarta Sans", Inter, sans-serif;
         }
 
         .hc-reset-filter {
@@ -405,7 +425,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           font-size: 20px;
           font-weight: 800;
           margin: 0;
-          font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+          font-family: "Plus Jakarta Sans", Inter, sans-serif;
         }
 
         .hc-time-box p {
@@ -422,6 +442,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           flex-direction: column;
           align-items: center;
           gap: 8px;
+          position: relative;
         }
 
         .hc-line {
@@ -433,7 +454,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
 
         .hc-line::before,
         .hc-line::after {
-          content: '';
+          content: "";
           position: absolute;
           width: 8px;
           height: 8px;
@@ -486,7 +507,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
           font-size: 26px;
           font-weight: 800;
           color: #0ea5e9;
-          font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+          font-family: "Plus Jakarta Sans", Inter, sans-serif;
         }
 
         .hc-seats {
@@ -524,7 +545,7 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
         .hc-empty-state h3 {
           font-size: 18px;
           margin-bottom: 8px;
-          font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+          font-family: "Plus Jakarta Sans", Inter, sans-serif;
         }
 
         .hc-empty-state p {

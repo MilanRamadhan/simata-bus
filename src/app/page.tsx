@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Shader, ChromaFlow, Swirl } from 'shaders/react';
-import { useAppStore } from '@/store/AppContext';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shader, ChromaFlow, Swirl } from "shaders/react";
+import { useAppStore } from "@/store/AppContext";
 
 /* ─── Magnetic Button Component ─── */
 function MagneticButton({
   children,
-  className = '',
-  variant = 'primary',
-  size = 'default',
+  className = "",
+  variant = "primary",
+  size = "default",
   onClick,
 }: {
   children: React.ReactNode;
   className?: string;
-  variant?: 'primary' | 'secondary' | 'ghost';
-  size?: 'default' | 'lg';
+  variant?: "primary" | "secondary" | "ghost";
+  size?: "default" | "lg";
   onClick?: () => void;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -43,20 +43,20 @@ function MagneticButton({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       if (ref.current) {
-        ref.current.style.transform = 'translate3d(0, 0, 0)';
+        ref.current.style.transform = "translate3d(0, 0, 0)";
       }
     });
   };
 
   const variants: Record<string, string> = {
-    primary: 'lp-mag-btn lp-mag-primary',
-    secondary: 'lp-mag-btn lp-mag-secondary',
-    ghost: 'lp-mag-btn lp-mag-ghost',
+    primary: "lp-mag-btn lp-mag-primary",
+    secondary: "lp-mag-btn lp-mag-secondary",
+    ghost: "lp-mag-btn lp-mag-ghost",
   };
 
   const sizes: Record<string, string> = {
-    default: '',
-    lg: 'lp-mag-lg',
+    default: "",
+    lg: "lp-mag-lg",
   };
 
   return (
@@ -66,7 +66,7 @@ function MagneticButton({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       className={`${variants[variant]} ${sizes[size]} ${className}`}
-      style={{ transform: 'translate3d(0, 0, 0)', contain: 'layout style paint' }}
+      style={{ transform: "translate3d(0, 0, 0)", contain: "layout style paint" }}
     >
       <span className="lp-mag-inner">{children}</span>
     </button>
@@ -108,38 +108,31 @@ function CustomCursor() {
       scaleOuter.current = lerp(scaleOuter.current, targetScaleOuter, 0.12);
       scaleInner.current = lerp(scaleInner.current, targetScaleInner, 0.12);
 
-      if (outerRef.current)
-        outerRef.current.style.transform = `translate3d(${pos.current.x}px,${pos.current.y}px,0) translate(-50%,-50%) scale(${scaleOuter.current})`;
-      if (innerRef.current)
-        innerRef.current.style.transform = `translate3d(${pos.current.x}px,${pos.current.y}px,0) translate(-50%,-50%) scale(${scaleInner.current})`;
+      if (outerRef.current) outerRef.current.style.transform = `translate3d(${pos.current.x}px,${pos.current.y}px,0) translate(-50%,-50%) scale(${scaleOuter.current})`;
+      if (innerRef.current) innerRef.current.style.transform = `translate3d(${pos.current.x}px,${pos.current.y}px,0) translate(-50%,-50%) scale(${scaleInner.current})`;
       raf = requestAnimationFrame(update);
     };
 
     const onMove = (e: MouseEvent) => {
       target.current = { x: e.clientX, y: e.clientY };
       const t = e.target as HTMLElement;
-      isPointer.current =
-        window.getComputedStyle(t).cursor === 'pointer' ||
-        t.tagName === 'BUTTON' ||
-        t.tagName === 'A' ||
-        t.closest('button') !== null ||
-        t.closest('a') !== null;
+      isPointer.current = window.getComputedStyle(t).cursor === "pointer" || t.tagName === "BUTTON" || t.tagName === "A" || t.closest("button") !== null || t.closest("a") !== null;
     };
 
-    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener("mousemove", onMove, { passive: true });
     raf = requestAnimationFrame(update);
     return () => {
-      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener("mousemove", onMove);
       cancelAnimationFrame(raf);
     };
   }, []);
 
   return (
     <>
-      <div ref={outerRef} className="lp-cursor-outer" style={{ contain: 'layout style paint' }}>
+      <div ref={outerRef} className="lp-cursor-outer" style={{ contain: "layout style paint" }}>
         <div className="lp-cursor-ring" />
       </div>
-      <div ref={innerRef} className="lp-cursor-inner" style={{ contain: 'layout style paint' }}>
+      <div ref={innerRef} className="lp-cursor-inner" style={{ contain: "layout style paint" }}>
         <div className="lp-cursor-dot" />
       </div>
     </>
@@ -158,7 +151,7 @@ function useReveal(threshold = 0.3) {
       ([entry]) => {
         if (entry.isIntersecting) setIsVisible(true);
       },
-      { threshold }
+      { threshold },
     );
     obs.observe(el);
     return () => obs.unobserve(el);
@@ -174,7 +167,7 @@ export default function LandingPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shaderContainerRef = useRef<HTMLDivElement>(null);
   const [currentSection, setCurrentSection] = useState(0);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [isLoaded, setIsLoaded] = useState(false);
   const sectionCount = 5;
 
@@ -182,7 +175,7 @@ export default function LandingPage() {
   useEffect(() => {
     const checkShaderReady = () => {
       if (shaderContainerRef.current) {
-        const canvas = shaderContainerRef.current.querySelector('canvas');
+        const canvas = shaderContainerRef.current.querySelector("canvas");
         if (canvas && canvas.width > 0 && canvas.height > 0) {
           setIsLoaded(true);
           return true;
@@ -211,19 +204,16 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace(user.role === 'admin' ? '/admin/dashboard' : '/home');
+      router.replace(user.role === "admin" ? "/admin/dashboard" : "/home");
     }
   }, [user, router]);
 
-  const scrollToSection = useCallback(
-    (index: number) => {
-      if (!scrollRef.current) return;
-      const w = scrollRef.current.offsetWidth;
-      scrollRef.current.scrollTo({ left: w * index, behavior: 'smooth' });
-      setCurrentSection(index);
-    },
-    []
-  );
+  const scrollToSection = useCallback((index: number) => {
+    if (!scrollRef.current) return;
+    const w = scrollRef.current.offsetWidth;
+    scrollRef.current.scrollTo({ left: w * index, behavior: "smooth" });
+    setCurrentSection(index);
+  }, []);
 
   /* Vertical wheel → horizontal scroll */
   useEffect(() => {
@@ -235,7 +225,7 @@ export default function LandingPage() {
 
         scrollRef.current.scrollBy({
           left: e.deltaY,
-          behavior: 'instant',
+          behavior: "instant",
         });
 
         const sectionWidth = scrollRef.current.offsetWidth;
@@ -248,12 +238,12 @@ export default function LandingPage() {
 
     const container = scrollRef.current;
     if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
+      container.addEventListener("wheel", handleWheel, { passive: false });
     }
 
     return () => {
       if (container) {
-        container.removeEventListener('wheel', handleWheel);
+        container.removeEventListener("wheel", handleWheel);
       }
     };
   }, [currentSection]);
@@ -284,12 +274,12 @@ export default function LandingPage() {
 
     const container = scrollRef.current;
     if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
+      container.addEventListener("scroll", handleScroll, { passive: true });
     }
 
     return () => {
       if (container) {
-        container.removeEventListener('scroll', handleScroll);
+        container.removeEventListener("scroll", handleScroll);
       }
       if (scrollThrottleRef.current) {
         cancelAnimationFrame(scrollThrottleRef.current);
@@ -299,7 +289,7 @@ export default function LandingPage() {
 
   if (user) return null;
 
-  const navItems = ['Beranda', 'Fitur', 'Layanan', 'Tentang', 'Masuk'];
+  const navItems = ["Beranda", "Fitur", "Layanan", "Tentang", "Masuk"];
 
   return (
     <main className="lp-main">
@@ -307,43 +297,16 @@ export default function LandingPage() {
       <GrainOverlay />
 
       {/* Animated Background — WebGL Shader */}
-      <div
-        ref={shaderContainerRef}
-        className={`lp-bg-shader ${isLoaded ? 'lp-loaded' : ''}`}
-        style={{ contain: 'strict' }}
-      >
+      <div ref={shaderContainerRef} className={`lp-bg-shader ${isLoaded ? "lp-loaded" : ""}`} style={{ contain: "strict" }}>
         <Shader className="lp-shader-canvas">
-          <Swirl
-            colorA="#ffffff"
-            colorB="#ffffff"
-            speed={0.8}
-            detail={0.8}
-            blend={50}
-            coarseX={40}
-            coarseY={40}
-            mediumX={40}
-            mediumY={40}
-            fineX={40}
-            fineY={40}
-          />
-          <ChromaFlow
-            baseColor="#ffffff"
-            upColor="#eeecec"
-            downColor="#b8b8b8"
-            leftColor="#c8c8c8"
-            rightColor="#c8c8c8"
-            intensity={0.9}
-            radius={1.8}
-            momentum={25}
-            maskType="alpha"
-            opacity={0.97}
-          />
+          <Swirl colorA="#ffffff" colorB="#ffffff" speed={0.8} detail={0.8} blend={50} coarseX={40} coarseY={40} mediumX={40} mediumY={40} fineX={40} fineY={40} />
+          <ChromaFlow baseColor="#ffffff" upColor="#eeecec" downColor="#b8b8b8" leftColor="#c8c8c8" rightColor="#c8c8c8" intensity={0.9} radius={1.8} momentum={25} maskType="alpha" opacity={0.97} />
         </Shader>
         <div className="lp-bg-overlay" />
       </div>
 
       {/* Navbar */}
-      <nav className={`lp-topnav ${isLoaded ? 'lp-loaded' : ''}`}>
+      <nav className={`lp-topnav ${isLoaded ? "lp-loaded" : ""}`}>
         <button className="lp-nav-brand" onClick={() => scrollToSection(0)}>
           <div className="lp-brand-icon">
             <span>S</span>
@@ -356,31 +319,25 @@ export default function LandingPage() {
             <button
               key={item}
               onClick={() => {
-                if (i === 4) setAuthMode('login');
+                if (i === 4) setAuthMode("login");
                 scrollToSection(i);
               }}
-              className={`lp-topnav-link ${currentSection === i ? 'active' : ''}`}
+              className={`lp-topnav-link ${currentSection === i ? "active" : ""}`}
             >
               {item}
-              <span className={`lp-topnav-underline ${currentSection === i ? 'active' : ''}`} />
+              <span className={`lp-topnav-underline ${currentSection === i ? "active" : ""}`} />
             </button>
           ))}
         </div>
-
       </nav>
 
       {/* Horizontal Scroll Sections */}
-      <div ref={scrollRef} className={`lp-scroll-container ${isLoaded ? 'lp-loaded' : ''}`}>
+      <div ref={scrollRef} className={`lp-scroll-container ${isLoaded ? "lp-loaded" : ""}`}>
         {/* ── Section 0: Hero ── */}
         <section className="lp-section lp-hero-section">
           <div className="lp-hero-content">
-            <motion.h1
-              className="lp-hero-title"
-              initial={{ opacity: 0, y: 40 }}
-              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 1, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <span style={{ textWrap: 'balance' }}>
+            <motion.h1 className="lp-hero-title" initial={{ opacity: 0, y: 40 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ duration: 1, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}>
+              <span style={{ textWrap: "balance" }}>
                 Perjalanan
                 <br />
                 <span className="lp-hero-title-accent">tanpa batas</span>
@@ -388,44 +345,34 @@ export default function LandingPage() {
                 <span className="lp-hero-title-accent">untuk Anda</span>
               </span>
             </motion.h1>
-            <motion.p
-              className="lp-hero-subtitle"
-              initial={{ opacity: 0, y: 20 }}
-              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 1, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <span style={{ textWrap: 'pretty' }}>
-                Platform pemesanan tiket bus modern yang menghubungkan ribuan rute
-                di seluruh Nusantara dengan pengalaman pemesanan instan terbaik.
-              </span>
+            <motion.p className="lp-hero-subtitle" initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ duration: 1, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}>
+              <span style={{ textWrap: "pretty" }}>Platform pemesanan tiket bus modern yang menghubungkan ribuan rute di seluruh Nusantara dengan pengalaman pemesanan instan terbaik.</span>
             </motion.p>
-            <motion.div
-              className="lp-hero-actions"
-              initial={{ opacity: 0, y: 20 }}
-              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 1, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <MagneticButton size="lg" variant="primary" onClick={() => {
-                setAuthMode('login');
-                scrollToSection(4);
-              }}>
+            <motion.div className="lp-hero-actions" initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ duration: 1, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}>
+              <MagneticButton
+                size="lg"
+                variant="primary"
+                onClick={() => {
+                  setAuthMode("login");
+                  scrollToSection(4);
+                }}
+              >
                 Masuk
               </MagneticButton>
-              <MagneticButton size="lg" variant="secondary" onClick={() => {
-                setAuthMode('register');
-                scrollToSection(4);
-              }}>
+              <MagneticButton
+                size="lg"
+                variant="secondary"
+                onClick={() => {
+                  setAuthMode("register");
+                  scrollToSection(4);
+                }}
+              >
                 Daftar
               </MagneticButton>
             </motion.div>
           </div>
 
-          <motion.div
-            className="lp-scroll-hint"
-            initial={{ opacity: 0 }}
-            animate={isLoaded ? { opacity: 1 } : {}}
-            transition={{ duration: 1, delay: 1.2 }}
-          >
+          <motion.div className="lp-scroll-hint" initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ duration: 1, delay: 1.2 }}>
             <p>Scroll untuk menjelajahi</p>
             <div className="lp-scroll-pill">
               <div className="lp-scroll-dot" />
@@ -443,14 +390,13 @@ export default function LandingPage() {
         <AboutSection scrollToSection={scrollToSection} />
 
         {/* ── Section 4: Masuk ── */}
-        <MasukSection
-          mode={authMode}
-          onModeChange={setAuthMode}
-        />
+        <MasukSection mode={authMode} onModeChange={setAuthMode} />
       </div>
 
       <style jsx global>{`
-        div::-webkit-scrollbar { display: none; }
+        div::-webkit-scrollbar {
+          display: none;
+        }
       `}</style>
     </main>
   );
@@ -462,31 +408,29 @@ function FeaturedSection() {
 
   const features = [
     {
-      number: '01',
-      title: 'Reservasi Instan',
-      category: 'Pemesanan Tiket',
-      direction: 'left',
+      number: "01",
+      title: "Reservasi Instan",
+      category: "Pemesanan Tiket",
+      direction: "left",
     },
     {
-      number: '02',
-      title: 'E-Tiket Digital',
-      category: 'QR Code & Paperless',
-      direction: 'right',
+      number: "02",
+      title: "E-Tiket Digital",
+      category: "QR Code & Paperless",
+      direction: "right",
     },
     {
-      number: '03',
-      title: '100% Aman',
-      category: 'Enkripsi Berlapis',
-      direction: 'left',
+      number: "03",
+      title: "100% Aman",
+      category: "Enkripsi Berlapis",
+      direction: "left",
     },
   ];
 
   return (
     <section ref={ref as React.Ref<HTMLElement>} className="lp-section lp-work-section">
       <div className="lp-section-inner">
-        <div
-          className={`lp-section-heading lp-anim-base ${isVisible ? 'revealed' : 'hidden-left'}`}
-        >
+        <div className={`lp-section-heading lp-anim-base ${isVisible ? "revealed" : "hidden-left"}`}>
           <h2>Fitur Unggulan</h2>
           <p className="lp-mono-sub">/ Apa yang membuat SIMATA berbeda</p>
         </div>
@@ -495,13 +439,7 @@ function FeaturedSection() {
           {features.map((f, i) => (
             <div
               key={i}
-              className={`lp-project-card lp-anim-base ${
-                isVisible
-                  ? 'revealed'
-                  : f.direction === 'left'
-                  ? 'hidden-left'
-                  : 'hidden-right'
-              }`}
+              className={`lp-project-card lp-anim-base ${isVisible ? "revealed" : f.direction === "left" ? "hidden-left" : "hidden-right"}`}
               style={{
                 transitionDelay: `${i * 150}ms`,
               }}
@@ -527,52 +465,53 @@ function ServicesSection() {
 
   const services = [
     {
-      title: 'Pemesanan Online',
-      description: 'Pesan tiket bus kapan saja, di mana saja melalui platform digital terpadu',
-      direction: 'top',
+      title: "Pemesanan Online",
+      description: "Pesan tiket bus kapan saja, di mana saja melalui platform digital terpadu",
+      direction: "top",
     },
     {
-      title: 'Pilih Kursi',
-      description: 'Pilih kursi favorit Anda secara real-time dengan visualisasi layout bus',
-      direction: 'right',
+      title: "Pilih Kursi",
+      description: "Pilih kursi favorit Anda secara real-time dengan visualisasi layout bus",
+      direction: "right",
     },
     {
-      title: 'Pembayaran Digital',
-      description: 'Bayar dengan QRIS, E-Wallet, atau transfer bank — aman dan instan',
-      direction: 'left',
+      title: "Pembayaran Digital",
+      description: "Bayar dengan QRIS, E-Wallet, atau transfer bank — aman dan instan",
+      direction: "left",
     },
     {
-      title: 'Manajemen Armada',
-      description: 'Sistem terpadu untuk PO Bus mengelola jadwal, rute, dan armada',
-      direction: 'bottom',
+      title: "Manajemen Armada",
+      description: "Sistem terpadu untuk PO Bus mengelola jadwal, rute, dan armada",
+      direction: "bottom",
     },
   ];
 
   const dirClass = (dir: string) => {
-    if (isVisible) return 'revealed';
+    if (isVisible) return "revealed";
     switch (dir) {
-      case 'left': return 'hidden-left';
-      case 'right': return 'hidden-right';
-      case 'top': return 'hidden-top';
-      case 'bottom': return 'hidden-bottom';
-      default: return 'hidden-bottom';
+      case "left":
+        return "hidden-left";
+      case "right":
+        return "hidden-right";
+      case "top":
+        return "hidden-top";
+      case "bottom":
+        return "hidden-bottom";
+      default:
+        return "hidden-bottom";
     }
   };
 
   return (
     <section ref={ref as React.Ref<HTMLElement>} className="lp-section lp-services-section">
       <div className="lp-section-inner">
-        <div className={`lp-section-heading lp-anim-base ${isVisible ? 'revealed' : 'hidden-top'}`}>
+        <div className={`lp-section-heading lp-anim-base ${isVisible ? "revealed" : "hidden-top"}`}>
           <h2>Layanan</h2>
           <p className="lp-mono-sub">/ Yang kami tawarkan</p>
         </div>
         <div className="lp-services-grid">
           {services.map((s, i) => (
-            <div
-              key={i}
-              className={`lp-service-card lp-anim-base ${dirClass(s.direction)}`}
-              style={{ transitionDelay: `${i * 150}ms` }}
-            >
+            <div key={i} className={`lp-service-card lp-anim-base ${dirClass(s.direction)}`} style={{ transitionDelay: `${i * 150}ms` }}>
               <div className="lp-service-num">
                 <div className="lp-service-line" />
                 <span>0{i + 1}</span>
@@ -592,9 +531,9 @@ function AboutSection({ scrollToSection }: { scrollToSection: (i: number) => voi
   const { ref, isVisible } = useReveal(0.3);
 
   const stats = [
-    { value: '150+', label: 'Proyek', sublabel: 'Terselesaikan dengan baik' },
-    { value: '8', label: 'Tahun', sublabel: 'Inovasi berkelanjutan' },
-    { value: '12', label: 'Penghargaan', sublabel: 'Pengakuan industri' },
+    { value: "150+", label: "Proyek", sublabel: "Terselesaikan dengan baik" },
+    { value: "8", label: "Tahun", sublabel: "Inovasi berkelanjutan" },
+    { value: "12", label: "Penghargaan", sublabel: "Pengakuan industri" },
   ];
 
   return (
@@ -602,7 +541,7 @@ function AboutSection({ scrollToSection }: { scrollToSection: (i: number) => voi
       <div className="lp-section-inner">
         <div className="lp-about-grid">
           <div className="lp-about-left">
-            <div className={`lp-section-heading lp-anim-base ${isVisible ? 'revealed' : 'hidden-top'}`}>
+            <div className={`lp-section-heading lp-anim-base ${isVisible ? "revealed" : "hidden-top"}`}>
               <h2>
                 Membangun
                 <br />
@@ -611,24 +550,12 @@ function AboutSection({ scrollToSection }: { scrollToSection: (i: number) => voi
                 <span className="lp-text-faded">digital</span>
               </h2>
             </div>
-            <div
-              className={`lp-about-desc lp-anim-base ${isVisible ? 'revealed' : 'hidden-bottom'}`}
-              style={{ transitionDelay: '200ms' }}
-            >
-              <p>
-                Kami adalah tim kreatif yang berfokus membangun pengalaman digital
-                modern dengan pendekatan desain dan teknologi yang matang.
-              </p>
-              <p>
-                Setiap produk kami rancang untuk memberikan nilai nyata,
-                performa tinggi, dan pengalaman pengguna yang berkesan.
-              </p>
+            <div className={`lp-about-desc lp-anim-base ${isVisible ? "revealed" : "hidden-bottom"}`} style={{ transitionDelay: "200ms" }}>
+              <p>Kami adalah tim kreatif yang berfokus membangun pengalaman digital modern dengan pendekatan desain dan teknologi yang matang.</p>
+              <p>Setiap produk kami rancang untuk memberikan nilai nyata, performa tinggi, dan pengalaman pengguna yang berkesan.</p>
             </div>
 
-            <div
-              className={`lp-about-actions lp-anim-base ${isVisible ? 'revealed' : 'hidden-bottom'}`}
-              style={{ transitionDelay: '500ms' }}
-            >
+            <div className={`lp-about-actions lp-anim-base ${isVisible ? "revealed" : "hidden-bottom"}`} style={{ transitionDelay: "500ms" }}>
               <MagneticButton size="lg" variant="primary" onClick={() => scrollToSection(4)}>
                 Mulai Proyek
               </MagneticButton>
@@ -642,13 +569,7 @@ function AboutSection({ scrollToSection }: { scrollToSection: (i: number) => voi
             {stats.map((st, i) => (
               <div
                 key={i}
-                className={`lp-stat-row lp-anim-base ${
-                  isVisible
-                    ? 'revealed'
-                    : i % 2 === 0
-                    ? 'hidden-left'
-                    : 'hidden-right'
-                }`}
+                className={`lp-stat-row lp-anim-base ${isVisible ? "revealed" : i % 2 === 0 ? "hidden-left" : "hidden-right"}`}
                 style={{
                   transitionDelay: `${300 + i * 150}ms`,
                 }}
@@ -668,56 +589,56 @@ function AboutSection({ scrollToSection }: { scrollToSection: (i: number) => voi
 }
 
 /* ─── Masuk Section ─── */
-function MasukSection({
-  mode,
-  onModeChange,
-}: {
-  mode: 'login' | 'register';
-  onModeChange: (mode: 'login' | 'register') => void;
-}) {
+function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onModeChange: (mode: "login" | "register") => void }) {
   const router = useRouter();
   const { ref, isVisible } = useReveal(0.3);
   const { login, register } = useAppStore();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "customer" });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const isLogin = mode === 'login';
+  const [error, setError] = useState("");
+  const isLogin = mode === "login";
 
   const switchMode = () => {
-    onModeChange(isLogin ? 'register' : 'login');
-    setError('');
-    setFormData({ name: '', email: '', password: '' });
+    onModeChange(isLogin ? "register" : "login");
+    setError("");
+    setFormData({ name: "", email: "", password: "", role: "customer" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsSubmitting(true);
 
     let ok = false;
+    let loggedInUser = null;
     if (isLogin) {
-      let customerOk = await login(formData.email, formData.password, 'customer');
-      let adminOk = !customerOk ? await login(formData.email, formData.password, 'admin') : false;
-      ok = customerOk || adminOk;
+      let customerOk = await login(formData.email, formData.password, "customer");
+      let adminOk = !customerOk ? await login(formData.email, formData.password, "admin") : false;
+      let providerOk = !customerOk && !adminOk ? await login(formData.email, formData.password, "provider") : false;
+      ok = customerOk || adminOk || providerOk;
       if (!ok) {
-        setError('Email atau password salah.');
+        setError("Email atau password salah.");
+      } else {
+        // we have to check what role user actually has
+        loggedInUser = { role: adminOk ? "admin" : providerOk ? "provider" : "customer" };
       }
     } else {
       if (!formData.name.trim()) {
-        setError('Nama wajib diisi.');
+        setError("Nama wajib diisi.");
         setIsSubmitting(false);
         return;
       }
-      ok = await register(formData.name.trim(), formData.email, formData.password);
+      ok = await register(formData.name.trim(), formData.email, formData.password, formData.role);
       if (!ok) {
-        setError('Email sudah terdaftar atau terjadi kesalahan.');
+        setError("Email sudah terdaftar atau terjadi kesalahan.");
+      } else {
+        loggedInUser = { role: formData.role };
       }
     }
 
     setIsSubmitting(false);
     if (ok) {
-      const isAdminLogin = isLogin && formData.email === 'admin@simata.com';
-      router.push(isAdminLogin ? '/admin/dashboard' : '/home');
+      router.push(loggedInUser?.role === "admin" || loggedInUser?.role === "provider" ? "/admin/dashboard" : "/home");
     }
   };
 
@@ -727,20 +648,15 @@ function MasukSection({
         <div className="lp-contact-grid">
           {/* Left side */}
           <div className="lp-contact-left-col">
-            <div className={`lp-section-heading lp-anim-base ${isVisible ? 'revealed' : 'hidden-left'}`}>
-              <h2>{isLogin ? 'Masuk' : 'Daftar'}</h2>
-              <p className="lp-mono-sub">
-                {isLogin ? '/ Masuk ke akun Anda' : '/ Buat akun customer baru'}
-              </p>
+            <div className={`lp-section-heading lp-anim-base ${isVisible ? "revealed" : "hidden-left"}`}>
+              <h2>{isLogin ? "Masuk" : "Daftar"}</h2>
+              <p className="lp-mono-sub">{isLogin ? "/ Masuk ke akun Anda" : "/ Buat akun customer baru"}</p>
             </div>
 
             <div className="lp-contact-info">
-              <div
-                className={`lp-contact-item lp-anim-base ${isVisible ? 'revealed' : 'hidden-left'}`}
-                style={{ transitionDelay: '200ms' }}
-              >
+              <div className={`lp-contact-item lp-anim-base ${isVisible ? "revealed" : "hidden-left"}`} style={{ transitionDelay: "200ms" }}>
                 <div className="lp-contact-label">Portal Customer</div>
-                <p>{isLogin ? 'Masuk untuk lanjut ke menu customer' : 'Daftar akun untuk mulai memesan tiket'}</p>
+                <p>{isLogin ? "Masuk untuk lanjut ke menu customer" : "Daftar akun untuk mulai memesan tiket"}</p>
               </div>
             </div>
           </div>
@@ -749,76 +665,58 @@ function MasukSection({
           <div className="lp-contact-form-col">
             <form onSubmit={handleSubmit} className="lp-contact-form" autoComplete="off">
               {!isLogin && (
-                <div
-                  className={`lp-form-group lp-anim-base ${isVisible ? 'revealed' : 'hidden-right'}`}
-                  style={{ transitionDelay: '200ms' }}
-                >
+                <div className={`lp-form-group lp-anim-base ${isVisible ? "revealed" : "hidden-right"}`} style={{ transitionDelay: "200ms" }}>
                   <label className="lp-form-label">Nama</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required={!isLogin}
-                    className="lp-form-input"
-                    placeholder="Nama Anda"
-                    autoComplete="off"
-                  />
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required={!isLogin} className="lp-form-input" placeholder="Nama Anda" autoComplete="off" />
                 </div>
               )}
 
-              <div
-                className={`lp-form-group lp-anim-base ${isVisible ? 'revealed' : 'hidden-right'}`}
-                style={{ transitionDelay: isLogin ? '200ms' : '350ms' }}
-              >
+              <div className={`lp-form-group lp-anim-base ${isVisible ? "revealed" : "hidden-right"}`} style={{ transitionDelay: isLogin ? "200ms" : "350ms" }}>
                 <label className="lp-form-label">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  className="lp-form-input"
-                  placeholder="contoh@gmail.com"
-                  autoComplete="off"
-                />
+                <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required className="lp-form-input" placeholder="contoh@gmail.com" autoComplete="off" />
               </div>
 
-              <div
-                className={`lp-form-group lp-anim-base ${isVisible ? 'revealed' : 'hidden-right'}`}
-                style={{ transitionDelay: isLogin ? '350ms' : '500ms' }}
-              >
+              <div className={`lp-form-group lp-anim-base ${isVisible ? "revealed" : "hidden-right"}`} style={{ transitionDelay: isLogin ? "350ms" : "500ms" }}>
                 <label className="lp-form-label">Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  className="lp-form-input"
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                />
+                <input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required className="lp-form-input" placeholder="••••••••" autoComplete="new-password" />
               </div>
+
+              {!isLogin && (
+                <div className="lp-form-group">
+                  <label className="lp-form-label">Daftar Sebagai</label>
+                  <select value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} className="lp-form-input">
+                    <option value="customer">Customer</option>
+                    <option value="provider">Penyedia Bus</option>
+                  </select>
+                </div>
+              )}
 
               {error && <p className="lp-form-error">{error}</p>}
 
-              <div
-                className={`lp-anim-base ${isVisible ? 'revealed' : 'hidden-bottom'}`}
-                style={{ transitionDelay: '650ms' }}
-              >
+              <div className={`lp-anim-base ${isVisible ? "revealed" : "hidden-bottom"}`} style={{ transitionDelay: "650ms", display: "flex", gap: "12px" }}>
                 <MagneticButton variant="primary" size="lg" className="lp-form-submit">
-                  {isSubmitting ? (isLogin ? 'Masuk...' : 'Mendaftar...') : (isLogin ? 'Masuk' : 'Daftar')}
+                  {isSubmitting ? (isLogin ? "Masuk..." : "Mendaftar...") : isLogin ? "Masuk" : "Daftar"}
+                </MagneticButton>
+                <MagneticButton
+                  variant="ghost"
+                  size="lg"
+                  className="lp-form-submit"
+                  onClick={() => {
+                    router.push("/home");
+                  }}
+                >
+                  Masuk tanpa login{" "}
                 </MagneticButton>
               </div>
-            </form>
-
-            <p className={`lp-auth-switch lp-anim-base ${isVisible ? 'revealed' : 'hidden-bottom'}`} style={{ transitionDelay: '760ms' }}>
-              {isLogin ? 'Belum punya akun?' : 'Sudah punya akun?'}{' '}
+            </form>{" "}
+            <p className={`lp-auth-switch lp-anim-base ${isVisible ? "revealed" : "hidden-bottom"}`} style={{ transitionDelay: "760ms" }}>
+              {isLogin ? "Belum punya akun?" : "Sudah punya akun?"}{" "}
               <button type="button" onClick={switchMode} className="lp-admin-link lp-auth-switch-btn">
-                {isLogin ? 'Daftar' : 'Masuk'}
+                {isLogin ? "Daftar" : "Masuk"}
               </button>
             </p>
           </div>
         </div>
-
       </div>
     </section>
   );
