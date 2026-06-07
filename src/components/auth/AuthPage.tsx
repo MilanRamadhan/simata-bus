@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { slideInRight, btnHover, staggerContainer, staggerItem } from '../../animations/variants';
+import { slideInRight, staggerContainer, staggerItem } from '../../animations/variants';
 import { useAppStore } from '../../store/AppContext';
 
 interface Props {
@@ -16,19 +16,31 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nik, setNik] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login, register } = useAppStore();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
     if (isLogin) {
-      const ok = login(email, password, role);
+      setLoading(true);
+      const ok = await login(email, password, role);
+      setLoading(false);
       if (!ok) { setError('Email atau password salah.'); return; }
       onSuccess();
     } else {
       if (!name.trim()) { setError('Nama wajib diisi.'); return; }
-      const ok = register(name.trim(), email, password, role);
+      if (role === 'customer') {
+        if (!nik.trim() || nik.trim().length < 16) { setError('NIK harus 16 digit.'); return; }
+        if (!phone.trim()) { setError('Nomor telepon wajib diisi.'); return; }
+      }
+      setLoading(true);
+      const ok = await register(name.trim(), email, password, role, nik.trim() || undefined, phone.trim() || undefined);
+      setLoading(false);
       if (!ok) { setError('Email sudah terdaftar.'); return; }
       onSuccess();
     }
@@ -40,6 +52,8 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
     setName('');
     setEmail('');
     setPassword('');
+    setNik('');
+    setPhone('');
   };
 
   return (
@@ -62,7 +76,6 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
           overflow: 'hidden',
         }}
       >
-        {/* Decorative bright elements */}
         <div style={{ position: 'absolute', width: 600, height: 600, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', top: -200, left: -200, filter: 'blur(40px)' }} />
         <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', bottom: -100, right: -100, filter: 'blur(30px)' }} />
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3Cpattern id=\'grid\' width=\'60\' height=\'60\' patternUnits=\'userSpaceOnUse\'%3E%3Cpath d=\'M 60 0 L 0 0 0 60\' fill=\'none\' stroke=\'rgba(255,255,255,0.06)\' stroke-width=\'1\'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width=\'100%25\' height=\'100%25\' fill=\'url(%23grid)\'/%3E%3C/svg%3E")', pointerEvents: 'none' }} />
@@ -108,25 +121,47 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
               </div>
             ))}
           </motion.div>
+
+          {/* Info sinkronisasi tiket */}
+          {!isLogin && role === 'customer' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                marginTop: 32, padding: '16px 20px',
+                borderRadius: 'var(--radius-lg)',
+                background: 'rgba(255,255,255,0.15)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>💡 Sudah pernah pesan tanpa login?</div>
+              <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.6 }}>
+                Daftar dengan email yang sama dan tiket kamu akan otomatis tersinkron ke akun ini.
+              </div>
+            </motion.div>
+          )}
         </motion.div>
       </motion.div>
 
       {/* Right — Form Panel */}
       <div style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 64, position: 'relative',
+        padding: '40px 64px', position: 'relative',
         background: 'var(--bg-white)',
+        overflowY: 'auto',
       }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={isLogin ? 'login' : 'register'}
-            variants={slideInRight}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
             style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}
           >
-            <div style={{ marginBottom: 40 }}>
+            <div style={{ marginBottom: 32 }}>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '6px 16px', borderRadius: 'var(--radius-full)',
@@ -139,16 +174,21 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
               <h2 style={{ fontSize: 32, fontWeight: 800, fontFamily: 'Outfit', letterSpacing: '-0.02em', color: 'var(--text-main)' }}>
                 {isLogin ? 'Selamat Datang Kembali' : 'Bergabung Bersama Kami'}
               </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: 16, marginTop: 10, lineHeight: 1.6 }}>
-                {isLogin ? 'Masuk ke akun Anda untuk melanjutkan pengalaman pemesanan yang tak tertandingi.' : 'Lengkapi data diri Anda di bawah untuk membuat akun baru.'}
+              <p style={{ color: 'var(--text-muted)', fontSize: 15, marginTop: 10, lineHeight: 1.6 }}>
+                {isLogin
+                  ? 'Masuk ke akun Anda untuk melanjutkan pengalaman pemesanan.'
+                  : role === 'customer'
+                    ? 'Lengkapi data diri Anda. NIK & telepon digunakan untuk sinkronisasi tiket.'
+                    : 'Lengkapi data diri Anda untuk membuat akun baru.'}
               </p>
             </div>
 
             <form onSubmit={handleSubmit}>
+              {/* Nama — hanya saat daftar */}
               {!isLogin && (
                 <div className="form-group">
                   <label className="form-label">Nama Lengkap</label>
-                  <input className="form-input" placeholder="Masukkan nama lengkap Anda" value={name} onChange={e => setName(e.target.value)} />
+                  <input className="form-input" placeholder="Sesuai KTP" value={name} onChange={e => setName(e.target.value)} />
                 </div>
               )}
 
@@ -157,9 +197,40 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
                 <input className="form-input" type="email" placeholder="contoh@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
 
+              {/* NIK & Telepon — hanya saat daftar customer */}
+              {!isLogin && role === 'customer' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">NIK (16 digit)</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={16}
+                      placeholder="Nomor Induk Kependudukan"
+                      value={nik}
+                      onChange={e => setNik(e.target.value.replace(/\D/g, ''))}
+                    />
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Digunakan untuk mengidentifikasi tiket yang dibeli sebelum login
+                    </p>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Nomor Telepon</label>
+                    <input
+                      className="form-input"
+                      type="tel"
+                      placeholder="08xxxxxxxxxx"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Kata Sandi</label>
-                <input className="form-input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+                <input className="form-input" type="password" placeholder="Min. 6 karakter" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
               </div>
 
               {error && (
@@ -167,11 +238,11 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   style={{
-                    color: '#991B1B', // Dark red
+                    color: '#991B1B',
                     fontSize: 14,
                     marginBottom: 20,
                     padding: '12px 16px',
-                    background: '#FEE2E2', // Light red
+                    background: '#FEE2E2',
                     border: '1px solid #F87171',
                     borderRadius: 'var(--radius-sm)',
                     fontWeight: 500,
@@ -181,12 +252,12 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
                 </motion.div>
               )}
 
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 12, padding: '16px', fontSize: 16 }}>
-                {isLogin ? 'Masuk ke Sistem' : 'Daftar Akun Baru'}
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 12, padding: '16px', fontSize: 16 }} disabled={loading}>
+                {loading ? 'Memproses...' : isLogin ? 'Masuk ke Sistem' : 'Daftar Akun Baru'}
               </button>
             </form>
 
-            <p style={{ textAlign: 'center', marginTop: 32, fontSize: 15, color: 'var(--text-muted)' }}>
+            <p style={{ textAlign: 'center', marginTop: 28, fontSize: 15, color: 'var(--text-muted)' }}>
               {isLogin ? 'Baru pertama kali di sini?' : 'Sudah menjadi anggota?'}{' '}
               <button onClick={switchMode} style={{ background: 'none', border: 'none', color: 'var(--primary-dark)', fontWeight: 700, cursor: 'pointer', fontSize: 15 }}>
                 {isLogin ? 'Buat Akun' : 'Masuk Sekarang'}
@@ -195,7 +266,9 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
 
             {onSwitchRole && (
               <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14 }}>
-                <button onClick={onSwitchRole} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', textDecoration: 'underline', transition: 'color 0.2s' }} onMouseEnter={(e)=> e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e)=> e.currentTarget.style.color = 'var(--text-light)'}>
+                <button onClick={onSwitchRole} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', textDecoration: 'underline', transition: 'color 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-light)'}>
                   {role === 'admin' ? 'Beralih ke Portal Pelanggan' : 'Beralih ke Portal Admin'}
                 </button>
               </p>
@@ -203,15 +276,15 @@ export default function AuthPage({ role, onSuccess, onSwitchRole }: Props) {
 
             {/* Demo credentials */}
             <div style={{
-              marginTop: 40, padding: 20,
+              marginTop: 36, padding: 20,
               background: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)',
               border: '1px solid var(--border-subtle)',
               fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.8,
             }}>
               <div style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: 8, fontSize: 14 }}>Data Uji Coba (Demo):</div>
               {role === 'admin'
-                ? <div style={{fontFamily: 'monospace', fontSize: 13 }}>admin@simata.com / admin123</div>
-                : <div style={{fontFamily: 'monospace', fontSize: 13 }}>budi@email.com / user123</div>}
+                ? <div style={{ fontFamily: 'monospace', fontSize: 13 }}>admin@simata.com / admin123</div>
+                : <div style={{ fontFamily: 'monospace', fontSize: 13 }}>budi@email.com / user123</div>}
             </div>
           </motion.div>
         </AnimatePresence>

@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, password, role } = body;
+    const { name, email, password, role, nik, phone } = body;
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -23,6 +23,20 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         role: role === "provider" ? "provider" : "customer",
+        nik: nik?.trim() || null,
+        phone: phone?.trim() || null,
+      },
+    });
+
+    // Auto-link tiket yang dibeli tanpa login menggunakan email yang sama
+    // Tiket yang passengerEmail-nya cocok dan belum punya passengerId
+    await prisma.ticket.updateMany({
+      where: {
+        passengerId: null,
+        passengerEmail: email,
+      },
+      data: {
+        passengerId: user.id,
       },
     });
 

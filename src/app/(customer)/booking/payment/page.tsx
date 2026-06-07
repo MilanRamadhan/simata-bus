@@ -27,6 +27,7 @@ export default function PaymentPage() {
       passengerName: passenger.fullName,
       passengerNik: passenger.nik,
       passengerPhone: passenger.phone,
+      passengerEmail: passenger.email,
       agencyName: selectedSchedule.agencyName,
       busName: selectedSchedule.busName,
       busClass: selectedSchedule.busClass,

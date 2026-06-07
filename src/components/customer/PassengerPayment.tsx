@@ -27,8 +27,8 @@ export default function PassengerPayment({ schedule, seatIds, user, onConfirm, o
   const totalPrice = schedule.price * seatIds.length;
   const [passenger, setPassenger] = useState<PassengerData>({
     fullName: user?.name ?? '',
-    nik: '',
-    phone: '',
+    nik: user?.nik ?? '',
+    phone: user?.phone ?? '',
     email: user?.email ?? '',
   });
   const [payment, setPayment] = useState<PaymentMethod | ''>('');

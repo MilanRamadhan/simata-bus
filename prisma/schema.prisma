@@ -13,6 +13,8 @@ model User {
   password  String
   name      String
   role      String   @default("customer") // "admin" | "customer" | "provider"
+  nik       String?  // NIK (opsional, diisi saat daftar atau diambil dari data tiket)
+  phone     String?  // Nomor telepon
   tickets   Ticket[]
   reviews   Review[]
   createdAt DateTime @default(now())
@@ -82,6 +84,7 @@ model Ticket {
   passengerName   String
   passengerNik    String
   passengerPhone  String
+  passengerEmail  String?  // Email penumpang — digunakan untuk auto-link ke akun saat registrasi
   agencyName      String
   busName         String
   busClass        String

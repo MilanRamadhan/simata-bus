@@ -5,6 +5,8 @@ export interface User {
   name: string;
   email: string;
   role: "admin" | "customer" | "provider";
+  nik?: string | null;
+  phone?: string | null;
 }
 
 export interface TravelAgency {
@@ -77,6 +79,7 @@ export interface Ticket {
   passengerName: string;
   passengerNik: string;
   passengerPhone: string;
+  passengerEmail?: string | null;
   agencyName: string;
   busName: string;
   busClass: string;

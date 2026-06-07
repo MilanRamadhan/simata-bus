@@ -13,7 +13,7 @@ interface AppState {
   myAgency: TravelAgency | null;
   userReviews: Review[]; // review yang sudah dikirim user yang login
   login: (email: string, password: string, role: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, role?: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, role?: string, nik?: string, phone?: string) => Promise<boolean>;
   logout: () => void;
   addAgency: (a: Omit<TravelAgency, "id">) => void;
   updateAgency: (a: TravelAgency) => void;
@@ -121,9 +121,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        // Check if role matches what's expected (UI checks customer vs admin)
         if (data.role === role) {
           setUser(data);
+          // Re-fetch tiket supaya tiket yang sudah di-link ke akun ini tampil langsung
+          await fetchAll();
           return true;
         }
       }
@@ -131,25 +132,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       return false;
     }
-  }, []);
+  }, [fetchAll]);
 
-  const register = useCallback(async (name: string, email: string, password: string, role?: string): Promise<boolean> => {
+  const register = useCallback(async (name: string, email: string, password: string, role?: string, nik?: string, phone?: string): Promise<boolean> => {
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, role, nik, phone }),
       });
       if (res.ok) {
         const data = await res.json();
         setUser(data);
+        // Re-fetch semua data supaya tiket yang sudah dibeli tanpa login
+        // (passengerEmail cocok) langsung muncul di riwayat
+        await fetchAll();
         return true;
       }
       return false;
     } catch {
       return false;
     }
-  }, []);
+  }, [fetchAll]);
 
   const logout = useCallback(() => setUser(null), []);
 
