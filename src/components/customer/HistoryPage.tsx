@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/AppContext";
 import { fadeSlideUp, staggerContainer, staggerItem, scaleIn } from "@/animations/variants";
 import type { Ticket, TransactionStatus } from "@/types";
+import { getDateOverride, localDateStr } from "@/lib/scheduleUtils";
 
 function formatPrice(n: number) {
   return "Rp " + n.toLocaleString("id-ID");
@@ -210,6 +211,25 @@ function ReviewModal({
   );
 }
 
+function formatTanggal(d: string) {
+  if (!d) return "—";
+  return new Date(d + "T00:00:00").toLocaleDateString("id-ID", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
+  });
+}
+
+function isTicketPast(ticket: Ticket): boolean {
+  if (!ticket.date) return false;
+  // Bandingkan tanggal lokal, bukan UTC
+  const todayLocal = localDateStr();
+  if (ticket.date < todayLocal) return true;
+  if (ticket.date > todayLocal) return false;
+  // Tanggal sama — cek jam
+  const [h, m] = (ticket.departureTime || "00:00").split(":").map(Number);
+  const now = new Date();
+  return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m);
+}
+
 export default function HistoryPage() {
   const { tickets, user, schedules, addReview, userReviews } = useAppStore();
   const [filter, setFilter] = useState("all");
@@ -310,6 +330,22 @@ export default function HistoryPage() {
             <motion.tbody variants={staggerContainer} initial="hidden" animate="visible">
               {userTickets.map((ticket) => {
                 const cfg = STATUS_CONFIG[ticket.status];
+                const isPast = isTicketPast(ticket);
+                const isActive = ticket.status === "Lunas" || ticket.status === "Menunggu Pembayaran";
+
+                // Cari jadwal terkait untuk cek delay
+                const relatedSchedule = schedules.find(
+                  (s) => s.agencyName === ticket.agencyName &&
+                         s.origin === ticket.origin &&
+                         s.destination === ticket.destination &&
+                         s.departureTime === ticket.departureTime
+                );
+                const override = relatedSchedule && ticket.date
+                  ? getDateOverride(relatedSchedule, ticket.date)
+                  : null;
+                const isDelayed = override?.status === "ditunda";
+                const isCancelledBySchedule = override?.status === "dibatalkan";
+
                 return (
                   <motion.tr
                     key={ticket.id}
@@ -321,6 +357,20 @@ export default function HistoryPage() {
                   >
                     <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
                       <span style={{ fontWeight: 700, color: "var(--text-main)", fontFamily: "monospace", fontSize: 14 }}>{ticket.id}</span>
+                      {/* Badge sudah lewat / belum berangkat */}
+                      {isActive && (
+                        <div style={{ marginTop: 6 }}>
+                          {isPast ? (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: "var(--radius-full)", background: "var(--bg-subtle)", color: "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
+                              Selesai
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: "var(--radius-full)", background: "#DCFCE7", color: "#166534", border: "1px solid #BBF7D0" }}>
+                              ● Belum Berangkat
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
                       <div style={{ fontWeight: 600, color: "var(--text-main)", fontSize: 15 }}>
@@ -331,10 +381,30 @@ export default function HistoryPage() {
                       </div>
                     </td>
                     <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
-                      <div style={{ fontSize: 14, color: "var(--text-main)" }}>{ticket.date}</div>
-                      <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                        {ticket.departureTime} – {ticket.arrivalTime}
-                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-main)" }}>{formatTanggal(ticket.date)}</div>
+                      {/* Jam: tunjukkan perubahan jika delay */}
+                      {isDelayed && override?.newDepartureTime ? (
+                        <div style={{ fontSize: 13, marginTop: 3 }}>
+                          <span style={{ color: "var(--text-muted)", textDecoration: "line-through" }}>{ticket.departureTime}</span>
+                          <span style={{ color: "#D97706", fontWeight: 700, marginLeft: 6 }}>→ {override.newDepartureTime}</span>
+                          <span style={{ color: "var(--text-muted)" }}> – {ticket.arrivalTime}</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                          {ticket.departureTime} – {ticket.arrivalTime}
+                        </div>
+                      )}
+                      {/* Banner delay/batal dari jadwal */}
+                      {isDelayed && !isPast && (
+                        <div style={{ marginTop: 6, padding: "4px 10px", borderRadius: "var(--radius)", background: "#FEF3C7", border: "1px solid #FCD34D", fontSize: 11, fontWeight: 600, color: "#92400E" }}>
+                          ⏰ Ditunda — {override?.note}
+                        </div>
+                      )}
+                      {isCancelledBySchedule && (
+                        <div style={{ marginTop: 6, padding: "4px 10px", borderRadius: "var(--radius)", background: "#FEE2E2", border: "1px solid #FCA5A5", fontSize: 11, fontWeight: 600, color: "#991B1B" }}>
+                          ✕ Jadwal dibatalkan — {override?.note}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
                       <span
@@ -467,20 +537,84 @@ export default function HistoryPage() {
 
               {/* Ticket body */}
               <div style={{ padding: "32px 36px", backgroundColor: "var(--bg-main)" }}>
+                {/* Banner delay/batal/status perjalanan */}
+                {(() => {
+                  const modalSchedule = schedules.find(
+                    (s) => s.agencyName === modalTicket.agencyName &&
+                           s.origin === modalTicket.origin &&
+                           s.destination === modalTicket.destination &&
+                           s.departureTime === modalTicket.departureTime
+                  );
+                  const modalOverride = modalSchedule && modalTicket.date
+                    ? getDateOverride(modalSchedule, modalTicket.date) : null;
+                  const modalDelayed = modalOverride?.status === "ditunda";
+                  const modalCancelled = modalOverride?.status === "dibatalkan";
+                  const modalPast = isTicketPast(modalTicket);
+                  const modalActive = modalTicket.status === "Lunas" || modalTicket.status === "Menunggu Pembayaran";
+
+                  return (
+                    <div style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+                      {/* Status perjalanan */}
+                      {modalActive && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: "var(--radius)", background: modalPast ? "var(--bg-subtle)" : "#DCFCE7", border: `1px solid ${modalPast ? "var(--border-subtle)" : "#BBF7D0"}` }}>
+                          <span style={{ fontSize: 14, marginRight: 2 }}>{modalPast ? "✓" : "●"}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: modalPast ? "var(--text-muted)" : "#166534" }}>
+                            {modalPast ? "Perjalanan sudah selesai" : "Belum berangkat"}
+                          </span>
+                        </div>
+                      )}
+                      {/* Delay info */}
+                      {modalDelayed && !modalPast && (
+                        <div style={{ padding: "10px 14px", borderRadius: "var(--radius)", background: "#FEF3C7", border: "1px solid #FCD34D" }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>⏰ Jadwal Ditunda</div>
+                          <div style={{ fontSize: 13, color: "#92400E" }}>
+                            Jam berangkat: <span style={{ textDecoration: "line-through" }}>{modalTicket.departureTime}</span>
+                            <span style={{ fontWeight: 700, marginLeft: 6 }}>→ {modalOverride?.newDepartureTime}</span>
+                          </div>
+                          {modalOverride?.note && <div style={{ fontSize: 12, color: "#B45309", marginTop: 4 }}>Alasan: {modalOverride.note}</div>}
+                        </div>
+                      )}
+                      {modalCancelled && (
+                        <div style={{ padding: "10px 14px", borderRadius: "var(--radius)", background: "#FEE2E2", border: "1px solid #FCA5A5" }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", marginBottom: 4 }}>✕ Jadwal Dibatalkan oleh Operator</div>
+                          {modalOverride?.note && <div style={{ fontSize: 12, color: "#B91C1C" }}>Alasan: {modalOverride.note}</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 36px", marginBottom: 28 }}>
-                  {[
-                    { label: "Penumpang", value: modalTicket.passengerName },
-                    { label: "NIK", value: modalTicket.passengerNik },
-                    { label: "Bus", value: `${modalTicket.agencyName} — ${modalTicket.busName}` },
-                    { label: "Kelas", value: modalTicket.busClass },
-                    { label: "Tanggal", value: modalTicket.date },
-                    { label: "Waktu", value: `${modalTicket.departureTime} – ${modalTicket.arrivalTime}` },
-                    { label: "Kursi", value: modalTicket.seatNumber },
-                    { label: "Pembayaran", value: modalTicket.paymentMethod },
-                  ].map((item) => (
+                  {(() => {
+                    const modalSchedule = schedules.find(
+                      (s) => s.agencyName === modalTicket.agencyName &&
+                             s.origin === modalTicket.origin &&
+                             s.destination === modalTicket.destination &&
+                             s.departureTime === modalTicket.departureTime
+                    );
+                    const modalOverride = modalSchedule && modalTicket.date
+                      ? getDateOverride(modalSchedule, modalTicket.date) : null;
+                    const newTime = modalOverride?.status === "ditunda" ? modalOverride.newDepartureTime : null;
+                    return [
+                      { label: "Penumpang", value: modalTicket.passengerName },
+                      { label: "NIK", value: modalTicket.passengerNik },
+                      { label: "Bus", value: `${modalTicket.agencyName} — ${modalTicket.busName}` },
+                      { label: "Kelas", value: modalTicket.busClass },
+                      { label: "Tanggal", value: formatTanggal(modalTicket.date) },
+                      {
+                        label: "Waktu",
+                        value: newTime
+                          ? `${modalTicket.departureTime} → ${newTime} (ditunda)`
+                          : `${modalTicket.departureTime} – ${modalTicket.arrivalTime}`,
+                        highlight: !!newTime,
+                      },
+                      { label: "Kursi", value: modalTicket.seatNumber },
+                      { label: "Pembayaran", value: modalTicket.paymentMethod },
+                    ];
+                  })().map((item) => (
                     <div key={item.label}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-light)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{item.label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-main)" }}>{item.value}</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: (item as any).highlight ? "#D97706" : "var(--text-main)" }}>{item.value}</div>
                     </div>
                   ))}
                 </div>

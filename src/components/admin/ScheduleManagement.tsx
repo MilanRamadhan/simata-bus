@@ -4,7 +4,9 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/AppContext";
 import { fadeSlideUp, staggerContainer, staggerItem, scaleIn } from "@/animations/variants";
-import type { BusSchedule } from "@/types";
+import type { BusSchedule, ScheduleDateOverride } from "@/types";
+import { getNextDepartureDate, formatTanggal, formatTanggalPanjang } from "@/lib/scheduleUtils";
+import ScheduleCalendarPicker from "./ScheduleCalendarPicker";
 import { SUMATERA_CITIES } from "@/lib/cities";
 
 function IconEdit() {
@@ -78,8 +80,24 @@ function CitySelect({ value, onChange, label }: { value: string; onChange: (v: s
   );
 }
 
+// ── Status badge helper ──
+function ScheduleStatusBadge({ status }: { status?: string }) {
+  if (!status || status === "aktif") return null;
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    ditunda: { bg: "#FEF3C7", color: "#92400E", label: "Ditunda" },
+    dibatalkan: { bg: "#FEE2E2", color: "#991B1B", label: "Dibatalkan" },
+  };
+  const s = map[status];
+  if (!s) return null;
+  return (
+    <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: s.bg, color: s.color, fontSize: 11, fontWeight: 700, marginLeft: 6 }}>
+      {s.label}
+    </span>
+  );
+}
+
 export default function ScheduleManagement() {
-  const { schedules, agencies, addSchedule, updateSchedule, deleteSchedule, tickets, user, myAgency } = useAppStore();
+  const { schedules, agencies, addSchedule, updateSchedule, deleteSchedule, updateScheduleStatus, tickets, user, myAgency } = useAppStore();
   const isProvider = user?.role === "provider";
 
   // Provider hanya lihat jadwal agency-nya sendiri
@@ -101,6 +119,54 @@ export default function ScheduleManagement() {
   const [form, setForm] = useState<Omit<BusSchedule, "id">>(EMPTY_FORM);
   const [showDelete, setShowDelete] = useState<string | null>(null);
   const [manifestId, setManifestId] = useState<string | null>(null);
+
+  // Tunda / Batalkan
+  const [statusModal, setStatusModal] = useState<{ id: string; mode: "ditunda" | "dibatalkan"; isRecurring: boolean } | null>(null);
+  const [statusNote, setStatusNote] = useState("");
+  const [statusNewTime, setStatusNewTime] = useState("");
+  const [statusTargetDate, setStatusTargetDate] = useState("");
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  // Daftar override yang sudah ada untuk jadwal berulang yang sedang dibuka
+  const existingOverrides = useMemo(() => {
+    if (!statusModal?.isRecurring) return [];
+    const sched = visibleSchedules.find((s) => s.id === statusModal.id);
+    return sched?.dateOverrides || [];
+  }, [statusModal, visibleSchedules]);
+
+
+  const openStatusModal = (id: string, mode: "ditunda" | "dibatalkan") => {
+    const sched = visibleSchedules.find((s) => s.id === id);
+    setStatusModal({ id, mode, isRecurring: !!sched?.isRecurring });
+    setStatusNote("");
+    setStatusNewTime("");
+    setStatusTargetDate("");
+  };
+
+  const handleStatusSave = async () => {
+    if (!statusModal || !statusNote.trim()) return;
+    if (statusModal.isRecurring && !statusTargetDate) return;
+    setStatusLoading(true);
+    await updateScheduleStatus(
+      statusModal.id,
+      statusModal.mode,
+      statusNote.trim(),
+      statusNewTime || undefined,
+      statusModal.isRecurring ? statusTargetDate : undefined,
+    );
+    setStatusLoading(false);
+    setStatusModal(null);
+  };
+
+  const handleReaktifkan = async (id: string, targetDate?: string) => {
+    const sched = visibleSchedules.find((s) => s.id === id);
+    await updateScheduleStatus(id, "aktif", "", "", sched?.isRecurring ? targetDate : undefined);
+  };
+
+  // Hapus satu override dari jadwal berulang
+  const handleHapusOverride = async (schedId: string, date: string) => {
+    await updateScheduleStatus(schedId, "aktif", "", "", date);
+  };
 
   const openAdd = () => {
     setEditId(null);
@@ -201,14 +267,13 @@ export default function ScheduleManagement() {
               <th style={{ padding: "20px 24px" }}>Kursi</th>
               <th style={{ padding: "20px 24px" }}>Harga</th>
               <th style={{ padding: "20px 24px", textAlign: "center" }}>MANIFEST</th>
-              <th style={{ padding: "20px 24px", textAlign: "center" }}>EDIT</th>
               <th style={{ padding: "20px 24px", textAlign: "center" }}>AKSI</th>
             </tr>
           </thead>
           <motion.tbody variants={staggerContainer} initial="hidden" animate="visible">
             {visibleSchedules.length === 0 && (
               <tr>
-                <td colSpan={10} style={{ padding: "60px 24px", textAlign: "center", color: "var(--text-muted)" }}>
+                <td colSpan={9} style={{ padding: "60px 24px", textAlign: "center", color: "var(--text-muted)" }}>
                   <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
                   <p>{isProvider && !myAgency ? "Atur profil armada Anda terlebih dahulu." : "Belum ada jadwal. Klik \"Tambah Jadwal\" untuk memulai."}</p>
                 </td>
@@ -225,13 +290,50 @@ export default function ScheduleManagement() {
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontWeight: 700, color: "var(--text-main)", fontSize: 15 }}>{s.agencyName}</div>
+                    <div style={{ fontWeight: 700, color: "var(--text-main)", fontSize: 15, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+                      {s.agencyName}
+                      <ScheduleStatusBadge status={s.scheduleStatus} />
+                    </div>
                     <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{s.busName}</div>
+                    {s.scheduleStatus === "ditunda" && (
+                      <div style={{ fontSize: 12, color: "#92400E", marginTop: 4 }}>
+                        {s.newDepartureTime && (
+                          <span style={{ fontWeight: 700 }}>
+                            {s.departureTime} → {s.newDepartureTime}
+                            {" · "}
+                          </span>
+                        )}
+                        {s.delayNote && <span style={{ fontStyle: "italic" }}>{s.delayNote}</span>}
+                      </div>
+                    )}
+                    {s.scheduleStatus === "dibatalkan" && s.delayNote && (
+                      <div style={{ fontSize: 12, color: "#991B1B", marginTop: 4, fontStyle: "italic" }}>
+                        {s.delayNote}
+                      </div>
+                    )}
                   </td>
                   <td style={{ fontWeight: 600, color: "var(--text-main)", padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
                     {s.origin} → {s.destination}
                   </td>
-                  <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>{s.isRecurring ? <span style={{ fontSize: 13, color: "var(--primary)", fontWeight: 600 }}>🔄 Setiap: {s.recurringDays}</span> : s.date}</td>
+                  <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
+                    {(() => {
+                      const nextDate = getNextDepartureDate(s);
+                      return (
+                        <div>
+                          {nextDate && (
+                            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-main)" }}>
+                              {formatTanggal(nextDate)}
+                            </div>
+                          )}
+                          {s.isRecurring && (
+                            <div style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, marginTop: 2 }}>
+                              Setiap {s.recurringDays}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)" }}>
                     {s.departureTime} – {s.arrivalTime}
                   </td>
@@ -267,29 +369,74 @@ export default function ScheduleManagement() {
                       <IconList />
                     </motion.button>
                   </td>
-                  <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="btn btn-ghost"
-                      onClick={() => openEdit(s)}
-                      title="Edit Jadwal"
-                      style={{ margin: "0 auto", padding: "8px", height: "auto" }}
-                    >
-                      <IconEdit />
-                    </motion.button>
-                  </td>
-                  <td style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="btn btn-ghost"
-                      onClick={() => setShowDelete(s.id)}
-                      title="Hapus Jadwal"
-                      style={{ margin: "0 auto", padding: "8px", height: "auto" }}
-                    >
-                      <IconTrash />
-                    </motion.button>
+                  {/* Kolom AKSI gabungan */}
+                  <td style={{ padding: "12px 16px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                      {/* Edit */}
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => openEdit(s)} title="Edit"
+                        style={{ padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border-subtle)", background: "var(--bg-white)", cursor: "pointer", display: "flex", alignItems: "center" }}
+                      >
+                        <IconEdit />
+                      </motion.button>
+
+                      {/* Tunda — hanya jika aktif atau sudah tunda */}
+                      {s.scheduleStatus !== "dibatalkan" && (
+                        s.scheduleStatus === "ditunda" ? (
+                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={() => handleReaktifkan(s.id)} title="Aktifkan kembali"
+                            style={{ padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid #A3E635", background: "#F7FEE7", cursor: "pointer", display: "flex", alignItems: "center" }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4D7C0F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </motion.button>
+                        ) : (
+                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={() => openStatusModal(s.id, "ditunda")} title="Tunda Jadwal"
+                            style={{ padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid #FCD34D", background: "#FFFBEB", cursor: "pointer", display: "flex", alignItems: "center" }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B45309" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                          </motion.button>
+                        )
+                      )}
+
+                      {/* Batalkan — hanya jika belum dibatalkan */}
+                      {s.scheduleStatus !== "dibatalkan" ? (
+                        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => openStatusModal(s.id, "dibatalkan")} title="Batalkan Jadwal"
+                          style={{ padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid #FCA5A5", background: "#FEF2F2", cursor: "pointer", display: "flex", alignItems: "center" }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="15" y1="9" x2="9" y2="15" />
+                            <line x1="9" y1="9" x2="15" y2="15" />
+                          </svg>
+                        </motion.button>
+                      ) : (
+                        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => handleReaktifkan(s.id)} title="Aktifkan kembali"
+                          style={{ padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid #A3E635", background: "#F7FEE7", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "#4D7C0F" }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4D7C0F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                          </svg>
+                          Aktifkan
+                        </motion.button>
+                      )}
+
+                      {/* Hapus */}
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowDelete(s.id)} title="Hapus Jadwal"
+                        style={{ padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border-subtle)", background: "var(--bg-white)", cursor: "pointer", display: "flex", alignItems: "center" }}
+                      >
+                        <IconTrash />
+                      </motion.button>
+                    </div>
                   </td>
                 </motion.tr>
               );
@@ -446,6 +593,228 @@ export default function ScheduleManagement() {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* ── Modal Tunda / Batalkan ── */}
+      <AnimatePresence>
+        {statusModal && (() => {
+          const schedInfo = visibleSchedules.find((s) => s.id === statusModal.id);
+          const isRecurring = statusModal.isRecurring;
+          const canSave = !!statusNote.trim()
+            && (!isRecurring || !!statusTargetDate)
+            && (statusModal.mode !== "ditunda" || !!statusNewTime);
+          return (
+            <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setStatusModal(null)}>
+              <motion.div variants={scaleIn} initial="hidden" animate="visible" exit="exit" className="modal-content"
+                style={{ maxWidth: 520, padding: 36 }} onClick={(e) => e.stopPropagation()}
+              >
+                {/* Icon + judul */}
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+                  <div style={{
+                    width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: statusModal.mode === "ditunda" ? "#FEF3C7" : "#FEE2E2",
+                  }}>
+                    {statusModal.mode === "ditunda" ? (
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B45309" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                    ) : (
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", fontFamily: "Outfit", margin: 0 }}>
+                      {statusModal.mode === "ditunda" ? "Tunda Jadwal" : "Batalkan Jadwal"}
+                    </h2>
+                    <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
+                      {schedInfo?.agencyName} · {schedInfo?.origin} → {schedInfo?.destination}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Jika berulang: pilih tanggal via kalender */}
+                {isRecurring && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: "var(--radius)", padding: "12px 14px" }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <p style={{ fontSize: 13, color: "#9A3412", lineHeight: 1.5, margin: 0 }}>
+                        Jadwal berulang. Klik tanggal keberangkatan yang ingin {statusModal.mode === "ditunda" ? "ditunda" : "dibatalkan"}. Tanggal lampau tidak dapat dipilih.
+                      </p>
+                    </div>
+
+                    <ScheduleCalendarPicker
+                      schedule={schedInfo!}
+                      selectedDate={statusTargetDate}
+                      onSelect={setStatusTargetDate}
+                      overrides={existingOverrides}
+                    />
+
+                    {/* Tanggal terpilih */}
+                    {statusTargetDate && (
+                      <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: "var(--radius)", background: "#FEF3C7", border: "1px solid #FCD34D", display: "flex", alignItems: "center", gap: 8 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
+                          Dipilih: {formatTanggalPanjang(statusTargetDate)}
+                        </span>
+                        <button onClick={() => setStatusTargetDate("")} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#B45309", padding: 0 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Daftar override yang sudah ada (jadwal berulang) */}
+                {isRecurring && existingOverrides.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10 }}>Penundaan/Pembatalan yang sudah ada:</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {existingOverrides.map((ov: ScheduleDateOverride) => (
+                        <div key={ov.date} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "10px 14px", borderRadius: "var(--radius)",
+                          background: ov.status === "dibatalkan" ? "#FEF2F2" : "#FFFBEB",
+                          border: `1px solid ${ov.status === "dibatalkan" ? "#FCA5A5" : "#FCD34D"}`,
+                        }}>
+                          <div>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: ov.status === "dibatalkan" ? "#991B1B" : "#92400E" }}>
+                              {new Date(ov.date).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                            </span>
+                            <span style={{
+                              marginLeft: 8, fontSize: 11, fontWeight: 700, padding: "2px 8px",
+                              borderRadius: "var(--radius-full)",
+                              background: ov.status === "dibatalkan" ? "#FEE2E2" : "#FEF3C7",
+                              color: ov.status === "dibatalkan" ? "#991B1B" : "#92400E",
+                            }}>
+                              {ov.status === "dibatalkan" ? "Dibatalkan" : "Ditunda"}
+                            </span>
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+                              {ov.status === "ditunda" && ov.newDepartureTime && (
+                                <span style={{ fontWeight: 700, color: "#92400E", marginRight: 6 }}>
+                                  {schedInfo?.departureTime} → {ov.newDepartureTime}
+                                </span>
+                              )}
+                              {ov.note}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleHapusOverride(statusModal.id, ov.date)}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text-muted)", flexShrink: 0 }}
+                            title="Aktifkan kembali tanggal ini"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alasan */}
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label">
+                    {statusModal.mode === "ditunda" ? "Alasan Penundaan *" : "Alasan Pembatalan *"}
+                  </label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    placeholder={statusModal.mode === "ditunda" ? "Contoh: Kerusakan mesin, cuaca buruk..." : "Contoh: Force majeure, bencana alam..."}
+                    value={statusNote}
+                    onChange={(e) => setStatusNote(e.target.value)}
+                    style={{ resize: "vertical", fontFamily: "inherit", fontSize: 14 }}
+                  />
+                </div>
+
+                {statusModal.mode === "ditunda" && (
+                  <div style={{ marginBottom: 20 }}>
+                    {/* Perbandingan jam asli vs jam baru */}
+                    <div style={{ display: "flex", gap: 12, alignItems: "stretch", marginBottom: 8 }}>
+                      {/* Jam asli */}
+                      <div style={{ flex: 1, padding: "12px 16px", borderRadius: "var(--radius)", background: "var(--bg-subtle)", border: "1.5px solid var(--border-subtle)" }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                          Jam Keberangkatan Asli
+                        </div>
+                        <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text-main)", fontFamily: "Outfit", letterSpacing: "-0.02em" }}>
+                          {schedInfo?.departureTime || "—"}
+                        </div>
+                      </div>
+
+                      {/* Panah */}
+                      <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)", flexShrink: 0 }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                      </div>
+
+                      {/* Jam baru */}
+                      <div style={{ flex: 1, padding: "12px 16px", borderRadius: "var(--radius)", background: statusNewTime ? "#FEF3C7" : "var(--bg-white)", border: `1.5px solid ${statusNewTime ? "#FCD34D" : "var(--border-subtle)"}`, transition: "all 0.2s" }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: statusNewTime ? "#92400E" : "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                          Di-delay Ke *
+                        </div>
+                        <input
+                          type="time"
+                          value={statusNewTime}
+                          onChange={(e) => setStatusNewTime(e.target.value)}
+                          style={{
+                            fontSize: 24, fontWeight: 800, color: statusNewTime ? "#92400E" : "var(--text-light)",
+                            fontFamily: "Outfit", letterSpacing: "-0.02em",
+                            border: "none", background: "transparent", outline: "none",
+                            width: "100%", padding: 0, cursor: "pointer",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {statusNewTime && schedInfo?.departureTime && (
+                      <div style={{ fontSize: 12, color: "#92400E", fontWeight: 600, textAlign: "center", marginTop: 6 }}>
+                        Diundur {(() => {
+                          const [oh, om] = schedInfo.departureTime.split(":").map(Number);
+                          const [nh, nm] = statusNewTime.split(":").map(Number);
+                          const diff = (nh * 60 + nm) - (oh * 60 + om);
+                          if (diff <= 0) return "—";
+                          const h = Math.floor(diff / 60), m = diff % 60;
+                          return h > 0 ? `${h} jam${m > 0 ? ` ${m} menit` : ""}` : `${m} menit`;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    className="btn btn-secondary btn-lg" style={{ flex: 1 }} onClick={() => setStatusModal(null)}
+                  >
+                    Tutup
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    className="btn btn-lg" disabled={!canSave || statusLoading}
+                    style={{
+                      flex: 1,
+                      background: statusModal.mode === "ditunda" ? "#F59E0B" : "#DC2626",
+                      color: "#fff", border: "none",
+                      opacity: (!canSave || statusLoading) ? 0.5 : 1,
+                      cursor: (!canSave || statusLoading) ? "not-allowed" : "pointer",
+                    }}
+                    onClick={handleStatusSave}
+                  >
+                    {statusLoading ? "Menyimpan..." : statusModal.mode === "ditunda" ? "Tunda Jadwal" : "Batalkan Jadwal"}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* ── Manifest Modal ── */}

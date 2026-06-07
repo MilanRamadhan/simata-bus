@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/AppContext";
 import type { BusSchedule, TravelAgency } from "@/types";
 import { SUMATERA_CITIES } from "@/lib/cities";
+import { getNextDepartureDate, hasUpcomingDeparture, formatTanggal, getDateOverride } from "@/lib/scheduleUtils";
+import BookingDatePicker from "./BookingDatePicker";
 
 interface Props {
   onSelectSchedule: (s: BusSchedule) => void;
@@ -38,78 +40,278 @@ function getFacilities(schedule: BusSchedule) {
   return ["AC", "USB Port"];
 }
 
-function TicketCard({ schedule, agency, onSelect }: { schedule: BusSchedule; agency?: TravelAgency; onSelect: () => void }) {
-  const availableSeats = schedule.totalSeats - schedule.bookedSeats.length;
-  const facilities = getFacilities(schedule);
-
+function BusLogoIcon({ agency, size = 28 }: { agency?: TravelAgency; size?: number }) {
+  const logoSrc = agency?.logo && (agency.logo.startsWith("data:") || agency.logo.startsWith("http")) ? agency.logo : null;
+  const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
+  if (logoSrc) {
+    return (
+      <img src={logoSrc} alt={agency?.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+        onError={(e) => { e.currentTarget.style.display = "none"; const p = e.currentTarget.parentElement; if (p) p.innerHTML = fallbackSvg; }} />
+    );
+  }
   return (
-    <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }} className="hc-ticket-card">
-      <div className="hc-ticket-left">
-        <div className="hc-bus-info">
-          <div className="hc-bus-logo">
-          {agency?.photos ? (
-            <img
-              src={agency.photos}
-              alt={agency.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                const parent = e.currentTarget.parentElement;
-                if (parent) parent.textContent = agency?.logo || "🚌";
-              }}
-            />
-          ) : (
-            agency?.logo || "🚌"
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="3" width="15" height="13" rx="2"/>
+      <path d="M16 8h4l3 5v3h-7V8z"/>
+      <circle cx="5.5" cy="18.5" r="2.5"/>
+      <circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+  );
+}
+
+function AgencyDetailModal({ schedule, agency, onClose, onSelect }: { schedule: BusSchedule; agency?: TravelAgency; onClose: () => void; onSelect: () => void }) {
+  const availableSeats = schedule.totalSeats - schedule.bookedSeats.length;
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 16 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.94, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "var(--bg-white)", borderRadius: "var(--radius-xl)", width: "100%", maxWidth: 520, overflow: "hidden", boxShadow: "var(--shadow-xl)" }}
+      >
+        {/* Foto armada */}
+        {agency?.photos ? (
+          <div style={{ width: "100%", height: 200, overflow: "hidden", background: "var(--bg-subtle)" }}>
+            <img src={agency.photos} alt={agency.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+        ) : (
+          <div style={{ width: "100%", height: 140, background: "var(--bg-subtle)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--border-subtle)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+            </svg>
+          </div>
+        )}
+
+        <div style={{ padding: 28 }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+            <div style={{ width: 48, height: 48, borderRadius: "var(--radius)", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+              <BusLogoIcon agency={agency} size={26} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "Outfit" }}>{schedule.agencyName}</h2>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>{schedule.busName} · {schedule.busClass}</p>
+            </div>
+            {agency?.rating && (
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, color: "#F59E0B", fontWeight: 700, fontSize: 14 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                {agency.rating.toFixed(1)}
+              </div>
+            )}
+          </div>
+
+          {/* Info rute */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--bg-subtle)", borderRadius: "var(--radius)", padding: "14px 18px", marginBottom: 16 }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)" }}>{schedule.departureTime}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{schedule.origin}</div>
+            </div>
+            <div style={{ flex: 1, borderTop: "2px dashed var(--border-subtle)", position: "relative" }}>
+              <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", fontSize: 11, color: "var(--text-muted)", background: "var(--bg-subtle)", padding: "0 6px", whiteSpace: "nowrap" }}>
+                {getDuration(schedule.departureTime, schedule.arrivalTime)}
+              </div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-main)" }}>{schedule.arrivalTime}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{schedule.destination}</div>
+            </div>
+          </div>
+
+          {/* Info tambahan */}
+          {agency?.description && (
+            <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, marginBottom: 16 }}>{agency.description}</p>
           )}
-        </div>
-          <div className="hc-bus-name">
-            <h3>{schedule.agencyName}</h3>
-            <p>{schedule.busClass}</p>
+
+          {/* Footer */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--primary)", fontFamily: "Outfit" }}>{formatPrice(schedule.price)}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Tersisa {availableSeats} kursi</div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: "var(--radius-full)", border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-main)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                Tutup
+              </button>
+              <button onClick={onSelect} className="hc-btn-book" style={{ padding: "10px 22px", fontSize: 14 }}>
+                Pilih Tiket
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="hc-route-info">
-          <div className="hc-time-box">
-            <h4>{schedule.departureTime}</h4>
-            <p>{schedule.origin}</p>
-          </div>
-
-          <div className="hc-route-line">
-            <div className="hc-duration">{getDuration(schedule.departureTime, schedule.arrivalTime)}</div>
-            <div className="hc-line" />{" "}
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, textAlign: "center", position: "absolute", top: 32, width: "100%" }}>{schedule.isRecurring ? `🔄 Setiap ${schedule.recurringDays}` : schedule.date}</div>{" "}
-          </div>
-
-          <div className="hc-time-box">
-            <h4>{schedule.arrivalTime}</h4>
-            <p>{schedule.destination}</p>
-          </div>
-        </div>
-
-        <div className="hc-facilities">
-          {facilities.map((facility) => (
-            <span key={facility} className="hc-facility-tag">
-              {facility}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="hc-ticket-right">
-        <div>
-          <div className="hc-price">{formatPrice(schedule.price)}</div>
-          <div className="hc-seats">Tersisa {availableSeats} Kursi</div>
-        </div>
-        <button className="hc-btn-book" onClick={onSelect}>
-          Pilih Tiket
-        </button>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
 
+function TicketCard({ schedule, agency, onSelect }: { schedule: BusSchedule; agency?: TravelAgency; onSelect: () => void }) {
+  const availableSeats = schedule.totalSeats - schedule.bookedSeats.length;
+  const facilities = getFacilities(schedule);
+  const [showDetail, setShowDetail] = useState(false);
+
+  // Hitung tanggal keberangkatan berikutnya
+  const nextDate = getNextDepartureDate(schedule);
+
+  // Cek apakah tanggal berikutnya punya override (tunda/batal)
+  const nextOverride = schedule.isRecurring && nextDate
+    ? getDateOverride(schedule, nextDate)
+    : null;
+
+  const activeStatus = schedule.isRecurring
+    ? (nextOverride?.status ?? "aktif")
+    : (schedule.scheduleStatus ?? "aktif");
+
+  const activeNote = schedule.isRecurring ? nextOverride?.note : schedule.delayNote;
+  const activeNewTime = schedule.isRecurring ? nextOverride?.newDepartureTime : schedule.newDepartureTime;
+
+  const isCancelled = activeStatus === "dibatalkan";
+  const isDelayed = activeStatus === "ditunda";
+
+  return (
+    <>
+      <motion.div
+        whileHover={!isCancelled ? { y: -2 } : undefined}
+        transition={{ duration: 0.2 }}
+        className="hc-ticket-card"
+        onClick={() => setShowDetail(true)}
+        style={{ cursor: "pointer", opacity: isCancelled ? 0.7 : 1, position: "relative", overflow: "hidden" }}
+      >
+        {/* Banner status */}
+        {(isCancelled || isDelayed) && (
+          <div style={{
+            position: "absolute", top: 0, left: 0, right: 0,
+            padding: "6px 16px",
+            background: isCancelled ? "#FEE2E2" : "#FEF3C7",
+            color: isCancelled ? "#991B1B" : "#92400E",
+            fontSize: 12, fontWeight: 700,
+            display: "flex", alignItems: "center", gap: 6,
+            zIndex: 2,
+          }}>
+            {isCancelled ? (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                Jadwal Dibatalkan{activeNote ? ` — ${activeNote}` : ""}
+              </>
+            ) : (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Jadwal Ditunda
+                {activeNewTime && (
+                  <span style={{ fontWeight: 800, marginLeft: 4 }}>
+                    · {schedule.departureTime} → {activeNewTime}
+                  </span>
+                )}
+                {activeNote ? ` · ${activeNote}` : ""}
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="hc-ticket-left" style={(isCancelled || isDelayed) ? { paddingTop: 36 } : undefined}>
+          <div className="hc-bus-info">
+            <div className="hc-bus-logo">
+              <BusLogoIcon agency={agency} size={28} />
+            </div>
+            <div className="hc-bus-name">
+              <h3>{schedule.agencyName}</h3>
+              <p>{schedule.busClass}</p>
+            </div>
+          </div>
+
+          <div className="hc-route-info">
+            <div className="hc-time-box">
+              <h4>{schedule.departureTime}</h4>
+              <p>{schedule.origin}</p>
+            </div>
+
+            <div className="hc-route-line">
+              <div className="hc-duration">{getDuration(schedule.departureTime, schedule.arrivalTime)}</div>
+              <div className="hc-line" />
+            </div>
+
+            <div className="hc-time-box">
+              <h4>{schedule.arrivalTime}</h4>
+              <p>{schedule.destination}</p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            {/* Tanggal keberangkatan berikutnya */}
+            {nextDate && (
+              <span style={{
+                fontSize: 12, fontWeight: 600,
+                color: isCancelled ? "#991B1B" : isDelayed ? "#92400E" : "var(--primary-dark)",
+                background: isCancelled ? "#FEE2E2" : isDelayed ? "#FEF3C7" : "var(--primary-light)",
+                borderRadius: "var(--radius-full)", padding: "3px 10px",
+                border: `1px solid ${isCancelled ? "#FCA5A5" : isDelayed ? "#FCD34D" : "var(--secondary-light)"}`,
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                {formatTanggal(nextDate)}
+              </span>
+            )}
+            {/* Label berulang */}
+            {schedule.isRecurring && (
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: "var(--text-muted)",
+                background: "var(--bg-subtle)", borderRadius: "var(--radius-full)",
+                padding: "3px 10px", border: "1px solid var(--border-subtle)",
+              }}>
+                Setiap {schedule.recurringDays}
+              </span>
+            )}
+          </div>
+
+          <div className="hc-facilities">
+            {facilities.map((facility) => (
+              <span key={facility} className="hc-facility-tag">
+                {facility}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="hc-ticket-right">
+          <div>
+            <div className="hc-price" style={{ color: isCancelled ? "var(--text-muted)" : undefined }}>{formatPrice(schedule.price)}</div>
+            <div className="hc-seats">Tersisa {availableSeats} Kursi</div>
+          </div>
+          <button
+            className="hc-btn-book"
+            disabled={isCancelled}
+            onClick={(e) => { e.stopPropagation(); if (!isCancelled) onSelect(); }}
+            style={isCancelled ? { background: "var(--bg-subtle)", color: "var(--text-muted)", cursor: "not-allowed", border: "1px solid var(--border-subtle)", boxShadow: "none" } : undefined}
+          >
+            {isCancelled ? "Tidak Tersedia" : isDelayed ? "Pilih Tiket" : "Pilih Tiket"}
+          </button>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {showDetail && (
+          <AgencyDetailModal
+            schedule={schedule}
+            agency={agency}
+            onClose={() => setShowDetail(false)}
+            onSelect={() => { setShowDetail(false); onSelect(); }}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 export default function CustomerHome({ onSelectSchedule }: Props) {
-  const { schedules, agencies } = useAppStore();
+  const { schedules, agencies, setSelectedBookingDate } = useAppStore();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [date, setDate] = useState("");
@@ -118,6 +320,27 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
   const [classFilter, setClassFilter] = useState<"" | "Ekonomi" | "Bisnis" | "Eksekutif">("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+
+  // State untuk date picker jadwal berulang
+  const [datePickerSchedule, setDatePickerSchedule] = useState<BusSchedule | null>(null);
+
+  const handleSelectSchedule = (s: BusSchedule) => {
+    if (s.isRecurring) {
+      // Jadwal berulang → tampilkan date picker dulu
+      setDatePickerSchedule(s);
+    } else {
+      // Jadwal tetap → tanggal sudah fix dari schedule.date
+      setSelectedBookingDate(s.date || null);
+      onSelectSchedule(s);
+    }
+  };
+
+  const handleDatePickerConfirm = (date: string) => {
+    if (!datePickerSchedule) return;
+    setSelectedBookingDate(date);
+    setDatePickerSchedule(null);
+    onSelectSchedule(datePickerSchedule);
+  };
 
   const agencyMap = useMemo(() => {
     const map: Record<string, TravelAgency> = {};
@@ -128,9 +351,11 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
   }, [agencies]);
 
   const filtered = useMemo(() => {
-    let result = schedules;
+    // Selalu filter jadwal yang sudah lewat terlebih dahulu
+    let result = schedules.filter(hasUpcomingDeparture);
+
     if (searched) {
-      result = schedules.filter((item) => {
+      result = result.filter((item) => {
         const matchOrigin = !origin || item.origin === origin;
         const matchDest = !destination || item.destination === destination;
 
@@ -274,11 +499,22 @@ export default function CustomerHome({ onSelectSchedule }: Props) {
         ) : (
           <div className="hc-ticket-list">
             {filtered.map((schedule) => (
-              <TicketCard key={schedule.id} schedule={schedule} agency={agencyMap[schedule.agencyId]} onSelect={() => onSelectSchedule(schedule)} />
+              <TicketCard key={schedule.id} schedule={schedule} agency={agencyMap[schedule.agencyId]} onSelect={() => handleSelectSchedule(schedule)} />
             ))}
           </div>
         )}
       </main>
+
+      {/* Modal pilih tanggal untuk jadwal berulang */}
+      <AnimatePresence>
+        {datePickerSchedule && (
+          <BookingDatePicker
+            schedule={datePickerSchedule}
+            onConfirm={handleDatePickerConfirm}
+            onClose={() => setDatePickerSchedule(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <style jsx global>{`
         .hc-page {

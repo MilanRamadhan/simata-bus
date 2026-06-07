@@ -9,13 +9,9 @@ import type { BusSchedule } from "@/types";
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, setSelectedSchedule, setSelectedSeat } = useAppStore();
+  const { setSelectedSchedule, setSelectedSeat } = useAppStore();
 
   const handleSelectSchedule = (s: BusSchedule) => {
-    if (!user) {
-      router.push("/?login=1");
-      return;
-    }
     setSelectedSchedule(s);
     setSelectedSeat("");
     router.push("/booking/seat");

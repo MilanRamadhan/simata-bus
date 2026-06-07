@@ -217,10 +217,14 @@ export default function LandingPage() {
     setCurrentSection(index);
   }, []);
 
-  // Jika diarahkan dari halaman home tanpa login (?login=1), scroll ke section Masuk
+  // Diarahkan dari navbar dengan ?login=1 atau ?register=1
   useEffect(() => {
-    if (searchParams.get("login") === "1" && isLoaded) {
+    if (!isLoaded) return;
+    if (searchParams.get("login") === "1") {
       setAuthMode("login");
+      scrollToSection(4);
+    } else if (searchParams.get("register") === "1") {
+      setAuthMode("register");
       scrollToSection(4);
     }
   }, [searchParams, isLoaded, scrollToSection]);
@@ -660,15 +664,9 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
           <div className="lp-contact-left-col">
             <div className={`lp-section-heading lp-anim-base ${isVisible ? "revealed" : "hidden-left"}`}>
               <h2>{isLogin ? "Masuk" : "Daftar"}</h2>
-              <p className="lp-mono-sub">{isLogin ? "/ Masuk ke akun Anda" : "/ Buat akun customer baru"}</p>
+
             </div>
 
-            <div className="lp-contact-info">
-              <div className={`lp-contact-item lp-anim-base ${isVisible ? "revealed" : "hidden-left"}`} style={{ transitionDelay: "200ms" }}>
-                <div className="lp-contact-label">Portal Customer</div>
-                <p>{isLogin ? "Masuk untuk lanjut ke menu customer" : "Daftar akun untuk mulai memesan tiket bus"}</p>
-              </div>
-            </div>
           </div>
 
           {/* Right side — Contact Form */}

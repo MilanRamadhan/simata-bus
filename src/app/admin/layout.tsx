@@ -9,12 +9,14 @@ const PAGE_MAP: Record<string, string> = {
   dashboard: "/admin/dashboard",
   agencies: "/admin/agencies",
   schedules: "/admin/schedules",
+  keuangan: "/admin/keuangan",
 };
 
 const PATH_TO_PAGE: Record<string, string> = {
   "/admin/dashboard": "dashboard",
   "/admin/agencies": "agencies",
   "/admin/schedules": "schedules",
+  "/admin/keuangan": "keuangan",
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

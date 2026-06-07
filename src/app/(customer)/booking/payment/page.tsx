@@ -10,7 +10,7 @@ import type { PassengerData, PaymentMethod } from '@/types';
 
 export default function PaymentPage() {
   const router = useRouter();
-  const { user, selectedSchedule, selectedSeat, bookTicket, bookSeat, setSelectedSchedule, setSelectedSeat } = useAppStore();
+  const { user, selectedSchedule, selectedSeat, selectedBookingDate, bookTicket, bookSeat, setSelectedSchedule, setSelectedSeat, setSelectedBookingDate } = useAppStore();
 
   const seatIds = selectedSeat ? selectedSeat.split(',').filter(Boolean) : [];
 
@@ -19,11 +19,11 @@ export default function PaymentPage() {
   }, [selectedSchedule, seatIds.length, router]);
 
   const handleConfirm = useCallback((passenger: PassengerData, method: PaymentMethod) => {
-    if (!selectedSchedule || !user || seatIds.length === 0) return;
+    if (!selectedSchedule || seatIds.length === 0) return;
 
     bookSeat(selectedSchedule.id, seatIds);
     bookTicket({
-      passengerId: user.id,
+      passengerId: user?.id ?? null,
       passengerName: passenger.fullName,
       passengerNik: passenger.nik,
       passengerPhone: passenger.phone,
@@ -32,7 +32,7 @@ export default function PaymentPage() {
       busClass: selectedSchedule.busClass,
       origin: selectedSchedule.origin,
       destination: selectedSchedule.destination,
-      date: selectedSchedule.date,
+      date: selectedBookingDate || selectedSchedule.date,
       departureTime: selectedSchedule.departureTime,
       arrivalTime: selectedSchedule.arrivalTime,
       seatNumber: seatIds.join(', '),
@@ -43,6 +43,7 @@ export default function PaymentPage() {
 
     setSelectedSchedule(null);
     setSelectedSeat('');
+    setSelectedBookingDate(null);
     router.push('/history');
   }, [selectedSchedule, seatIds, user, bookTicket, bookSeat, setSelectedSchedule, setSelectedSeat, router]);
 
@@ -54,6 +55,7 @@ export default function PaymentPage() {
         <PassengerPayment
           schedule={selectedSchedule}
           seatIds={seatIds}
+          user={user}
           onConfirm={handleConfirm}
           onBack={() => router.push('/booking/seat')}
         />

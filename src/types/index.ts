@@ -20,6 +20,16 @@ export interface TravelAgency {
   ownerId?: string; // User.id dari provider yang memiliki agency ini
 }
 
+export type ScheduleStatus = "aktif" | "ditunda" | "dibatalkan";
+
+// Override untuk tanggal spesifik pada jadwal berulang
+export interface ScheduleDateOverride {
+  date: string;               // "2025-06-10"
+  status: ScheduleStatus;
+  note: string;
+  newDepartureTime?: string;
+}
+
 export interface BusSchedule {
   id: string;
   agencyId: string;
@@ -36,6 +46,12 @@ export interface BusSchedule {
   busClass: "Ekonomi" | "Bisnis" | "Eksekutif";
   isRecurring?: boolean;
   recurringDays?: string;
+  // Untuk jadwal non-berulang
+  scheduleStatus?: ScheduleStatus;
+  delayNote?: string;
+  newDepartureTime?: string;
+  // Untuk jadwal berulang — override per tanggal
+  dateOverrides?: ScheduleDateOverride[];
 }
 
 export type SeatStatus = "available" | "booked" | "selected";
@@ -57,7 +73,7 @@ export type TransactionStatus = "Menunggu Pembayaran" | "Lunas" | "Kedaluwarsa" 
 
 export interface Ticket {
   id: string;
-  passengerId: string;
+  passengerId: string | null;
   passengerName: string;
   passengerNik: string;
   passengerPhone: string;

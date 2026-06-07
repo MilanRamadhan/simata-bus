@@ -91,7 +91,13 @@ export default function CustomerNavbar({ onNavigate }: Props) {
                 key={item.key}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => onNavigate(item.target)}
+                onClick={() => {
+                  if (item.key === "history" && !user) {
+                    onNavigate("/?login=1");
+                    return;
+                  }
+                  onNavigate(item.target);
+                }}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -173,24 +179,44 @@ export default function CustomerNavbar({ onNavigate }: Props) {
             </svg>
           </motion.button>
         ) : (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => onNavigate("/")}
-            style={{
-              padding: "8px 24px",
-              borderRadius: "var(--radius-full)",
-              border: "none",
-              background: "var(--primary)",
-              color: "#fff",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: "Inter, sans-serif",
-            }}
-          >
-            Masuk / Daftar
-          </motion.button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onNavigate("/?login=1")}
+              style={{
+                padding: "8px 20px",
+                borderRadius: "var(--radius-full)",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-white)",
+                color: "var(--text-main)",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              Masuk
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onNavigate("/?register=1")}
+              style={{
+                padding: "8px 20px",
+                borderRadius: "var(--radius-full)",
+                border: "none",
+                background: "var(--primary)",
+                color: "#fff",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              Daftar
+            </motion.button>
+          </div>
         )}
 
         <AnimatePresence>

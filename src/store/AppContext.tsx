@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
-import type { User, TravelAgency, BusSchedule, Ticket, Review } from "../types";
+import type { User, TravelAgency, BusSchedule, Ticket, Review, ScheduleStatus, ScheduleDateOverride } from "../types";
+import { localDateStr } from "@/lib/scheduleUtils";
 
 interface AppState {
   user: User | null;
@@ -23,10 +24,14 @@ interface AppState {
   bookTicket: (t: Omit<Ticket, "id" | "bookingDate">) => void;
   bookSeat: (scheduleId: string, seatId: string) => void;
   addReview: (review: { agencyId: string; rating: number; comment?: string; photos?: string }) => Promise<{ ok: boolean; error?: string }>;
+  // targetDate: jika diisi → override tanggal spesifik (jadwal berulang); jika kosong → update status jadwal itu sendiri
+  updateScheduleStatus: (scheduleId: string, status: ScheduleStatus, note: string, newTime?: string, targetDate?: string) => Promise<void>;
   selectedSchedule: BusSchedule | null;
   selectedSeat: string;
+  selectedBookingDate: string | null;   // tanggal spesifik yang dipilih customer (untuk jadwal berulang)
   setSelectedSchedule: (s: BusSchedule | null) => void;
   setSelectedSeat: (seat: string) => void;
+  setSelectedBookingDate: (date: string | null) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -63,6 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userReviews, setUserReviews] = useState<Review[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<BusSchedule | null>(null);
   const [selectedSeat, setSelectedSeat] = useState("");
+  const [selectedBookingDate, setSelectedBookingDate] = useState<string | null>(null);
 
   // Agency milik provider yang sedang login (null untuk admin/customer)
   const myAgency = user?.role === "provider"
@@ -77,7 +83,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const tkt = resT.ok ? await resT.json() : [];
 
       setAgencies(Array.isArray(agg) ? agg.map((a: any) => ({ ...a, routes: parseRoutes(a.routes) })) : []);
-      setSchedules(Array.isArray(sch) ? sch.map((s: any) => ({ ...s, bookedSeats: JSON.parse(s.bookedSeats || "[]") })) : []);
+      setSchedules(Array.isArray(sch) ? sch.map((s: any) => ({
+        ...s,
+        bookedSeats: (() => { try { return JSON.parse(s.bookedSeats || "[]"); } catch { return []; } })(),
+        dateOverrides: (() => {
+          try {
+            const raw = s.dateOverrides;
+            if (!raw || raw === "null") return [];
+            return JSON.parse(raw);
+          } catch { return []; }
+        })(),
+      })) : []);
       setTickets(Array.isArray(tkt) ? tkt : []);
     } catch (e) {
       console.error(e);
@@ -180,7 +196,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateSchedule = useCallback(async (s: BusSchedule) => {
     const res = await fetch(`/api/schedules/${s.id}`, {
       method: "PUT",
-      body: JSON.stringify({ ...s, bookedSeats: JSON.stringify(s.bookedSeats) }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...s,
+        bookedSeats:   JSON.stringify(s.bookedSeats   || []),
+        dateOverrides: JSON.stringify(s.dateOverrides || []),
+      }),
     });
     if (res.ok) {
       setSchedules((prev) => prev.map((x) => (x.id === s.id ? s : x)));
@@ -203,7 +224,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? { ...s, bookedSeats: newSeats } : s)));
       await fetch(`/api/schedules/${scheduleId}`, {
         method: "PUT",
-        body: JSON.stringify({ ...sched, bookedSeats: JSON.stringify(newSeats) }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...sched,
+          bookedSeats:   JSON.stringify(newSeats),
+          dateOverrides: JSON.stringify(sched.dateOverrides || []),
+        }),
       });
     },
     [schedules],
@@ -212,13 +238,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const bookTicket = useCallback(async (t: Omit<Ticket, "id" | "bookingDate">) => {
     const res = await fetch("/api/tickets", {
       method: "POST",
-      body: JSON.stringify({ ...t, bookingDate: new Date().toISOString().slice(0, 10) }),
+      body: JSON.stringify({ ...t, bookingDate: localDateStr() }),
     });
     if (res.ok) {
       const saved = await res.json();
       setTickets((prev) => [saved, ...prev]);
     }
   }, []);
+
+  const updateScheduleStatus = useCallback(
+    async (scheduleId: string, status: ScheduleStatus, note: string, newTime?: string, targetDate?: string) => {
+      const sched = schedules.find((s) => s.id === scheduleId);
+      if (!sched) return;
+
+      let updated: BusSchedule;
+
+      if (sched.isRecurring && targetDate) {
+        // Mode override tanggal spesifik
+        const override: ScheduleDateOverride = {
+          date: targetDate,
+          status,
+          note,
+          newDepartureTime: newTime,
+        };
+        const existing = sched.dateOverrides || [];
+        const newOverrides = [
+          ...existing.filter((o) => o.date !== targetDate), // hapus override lama untuk tanggal ini
+          ...(status === "aktif" ? [] : [override]),         // "aktif" = hapus override (reaktifkan)
+        ];
+        updated = { ...sched, dateOverrides: newOverrides };
+      } else {
+        // Mode jadwal tidak berulang — update status langsung
+        updated = {
+          ...sched,
+          scheduleStatus: status,
+          delayNote: note,
+          newDepartureTime: newTime || sched.newDepartureTime,
+        };
+      }
+
+      const res = await fetch(`/api/schedules/${scheduleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...updated,
+          bookedSeats:    JSON.stringify(updated.bookedSeats    || []),
+          dateOverrides:  JSON.stringify(updated.dateOverrides  || []),
+        }),
+      });
+
+      if (res.ok) {
+        setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? updated : s)));
+
+        // Batalkan tiket terkait jika status = dibatalkan
+        if (status === "dibatalkan") {
+          const dateToCheck = sched.isRecurring ? targetDate : sched.date;
+          const affected = tickets.filter(
+            (t) =>
+              t.agencyName === sched.agencyName &&
+              t.date === dateToCheck &&
+              t.departureTime === sched.departureTime &&
+              t.origin === sched.origin &&
+              t.destination === sched.destination &&
+              t.status !== "Dibatalkan"
+          );
+          for (const t of affected) {
+            await fetch(`/api/tickets/${t.id}`, {
+              method: "PUT",
+              body: JSON.stringify({ ...t, status: "Dibatalkan" }),
+            });
+          }
+          if (affected.length > 0) {
+            setTickets((prev) =>
+              prev.map((t) =>
+                affected.find((a) => a.id === t.id) ? { ...t, status: "Dibatalkan" as const } : t
+              )
+            );
+          }
+        }
+      }
+    },
+    [schedules, tickets]
+  );
 
   const addReview = useCallback(
     async (review: { agencyId: string; rating: number; comment?: string; photos?: string }): Promise<{ ok: boolean; error?: string }> => {
@@ -260,10 +361,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         bookTicket,
         bookSeat,
         addReview,
+        updateScheduleStatus,
         selectedSchedule,
         selectedSeat,
+        selectedBookingDate,
         setSelectedSchedule,
         setSelectedSeat,
+        setSelectedBookingDate,
       }}
     >
       {children}

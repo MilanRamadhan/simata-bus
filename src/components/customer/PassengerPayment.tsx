@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeSlideUp, staggerContainer, staggerItem, scaleIn } from '@/animations/variants';
-import type { BusSchedule, PassengerData, PaymentMethod } from '@/types';
+import type { BusSchedule, PassengerData, PaymentMethod, User } from '@/types';
 
 interface Props {
   schedule: BusSchedule;
   seatIds: string[];
+  user?: User | null;
   onConfirm: (passenger: PassengerData, payment: PaymentMethod) => void;
   onBack: () => void;
 }
@@ -22,13 +23,13 @@ const PAYMENT_METHODS: { method: PaymentMethod; icon: string; desc: string }[] =
   { method: 'E-Wallet', icon: '💳', desc: 'GoPay, OVO, DANA, ShopeePay' },
 ];
 
-export default function PassengerPayment({ schedule, seatIds, onConfirm, onBack }: Props) {
+export default function PassengerPayment({ schedule, seatIds, user, onConfirm, onBack }: Props) {
   const totalPrice = schedule.price * seatIds.length;
   const [passenger, setPassenger] = useState<PassengerData>({
-    fullName: '',
+    fullName: user?.name ?? '',
     nik: '',
     phone: '',
-    email: '',
+    email: user?.email ?? '',
   });
   const [payment, setPayment] = useState<PaymentMethod | ''>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -66,11 +67,12 @@ export default function PassengerPayment({ schedule, seatIds, onConfirm, onBack 
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="btn btn-secondary btn-icon"
           onClick={onBack}
-          style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 'var(--radius)', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)' }}
+          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 'var(--radius)', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
-          <span style={{ fontSize: 24, lineHeight: 1, fontWeight: 700, color: 'var(--text-main)' }}>←</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </motion.button>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>

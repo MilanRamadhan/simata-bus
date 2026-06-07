@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/AppContext";
 import { fadeSlideUp, staggerContainer, staggerItem, scaleIn } from "@/animations/variants";
@@ -24,6 +24,28 @@ function IconTrash() {
       <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
     </svg>
   );
+}
+
+function BusIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="3" width="15" height="13" rx="2"/>
+      <path d="M16 8h4l3 5v3h-7V8z"/>
+      <circle cx="5.5" cy="18.5" r="2.5"/>
+      <circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+  );
+}
+
+function AgencyLogo({ logo, name, size }: { logo: string; name: string; size: number }) {
+  const src = logo?.startsWith("data:") || logo?.startsWith("http") ? logo : null;
+  if (src) {
+    return (
+      <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        onError={(e) => { e.currentTarget.style.display = "none"; const p = e.currentTarget.parentElement; if (p) p.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`; }} />
+    );
+  }
+  return <BusIcon size={size} />;
 }
 
 function StarRating({ value }: { value: number }) {
@@ -59,6 +81,29 @@ export default function AgencyManagement() {
   const [providerPassword, setProviderPassword] = useState("");
   const [providerError, setProviderError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setForm((f) => ({ ...f, photos: ev.target?.result as string }));
+      setPhotoPreviewError(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setForm((f) => ({ ...f, logo: ev.target?.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const visibleAgencies = useMemo(() => {
     if (!isProvider) return agencies;
@@ -182,11 +227,8 @@ export default function AgencyManagement() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <div style={{ width: 72, height: 72, borderRadius: "var(--radius)", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, flexShrink: 0 }}>
-                {myAgency.photos ? (
-                  <img src={myAgency.photos} alt={myAgency.name} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    onError={(e) => { e.currentTarget.style.display = "none"; const p = e.currentTarget.parentElement; if (p) p.textContent = myAgency.logo; }} />
-                ) : myAgency.logo}
+              <div style={{ width: 72, height: 72, borderRadius: "var(--radius)", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <AgencyLogo logo={myAgency.logo} name={myAgency.name} size={36} />
               </div>
               <div>
                 <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-main)", margin: 0, fontFamily: "Outfit" }}>{myAgency.name}</h2>
@@ -241,11 +283,8 @@ export default function AgencyManagement() {
                 >
                   <td style={{ padding: "16px 24px", borderTop: "1px solid var(--border-subtle)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <div style={{ width: 52, height: 52, borderRadius: "var(--radius)", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>
-                        {a.photos ? (
-                          <img src={a.photos} alt={a.name} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            onError={(e) => { e.currentTarget.style.display = "none"; const p = e.currentTarget.parentElement; if (p) p.textContent = a.logo; }} />
-                        ) : a.logo}
+                      <div style={{ width: 52, height: 52, borderRadius: "var(--radius)", background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <AgencyLogo logo={a.logo} name={a.name} size={26} />
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, color: "var(--text-main)", fontSize: 15 }}>{a.name}</div>
@@ -295,14 +334,67 @@ export default function AgencyManagement() {
               </h2>
 
               {/* Info dasar */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 72px", gap: 16 }}>
-                <div className="form-group">
-                  <label className="form-label">Nama PO Bus / Agency</label>
-                  <input className="form-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Contoh: PO Kurnia Aceh" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Logo</label>
-                  <input className="form-input" value={form.logo} onChange={(e) => setForm((f) => ({ ...f, logo: e.target.value }))} placeholder="🚌" style={{ textAlign: "center", fontSize: 20 }} />
+              <div className="form-group">
+                <label className="form-label">Nama PO Bus / Agency</label>
+                <input className="form-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Contoh: PO Kurnia Aceh" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Logo Armada</label>
+                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoFileChange} />
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div
+                    onClick={() => logoInputRef.current?.click()}
+                    style={{
+                      width: 72, height: 72, borderRadius: "var(--radius)",
+                      border: "2px dashed var(--border-subtle)",
+                      background: "var(--bg-subtle)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: "pointer", overflow: "hidden", flexShrink: 0,
+                      transition: "border-color 0.2s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+                  >
+                    {form.logo && form.logo.startsWith("data:") ? (
+                      <img src={form.logo} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      style={{
+                        padding: "8px 16px", borderRadius: "var(--radius)",
+                        border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)",
+                        color: "var(--text-main)", fontSize: 13, fontWeight: 600,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      Pilih File Logo
+                    </button>
+                    {form.logo && form.logo.startsWith("data:") && (
+                      <button
+                        type="button"
+                        onClick={() => { setForm((f) => ({ ...f, logo: "🚌" })); if (logoInputRef.current) logoInputRef.current.value = ""; }}
+                        style={{ marginTop: 6, padding: "4px 10px", borderRadius: "var(--radius)", border: "none", background: "transparent", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", display: "block" }}
+                      >
+                        Hapus logo
+                      </button>
+                    )}
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>PNG, JPG, SVG — maks 2MB</p>
+                  </div>
                 </div>
               </div>
 
@@ -323,10 +415,69 @@ export default function AgencyManagement() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">URL Foto</label>
-                <input className="form-input" value={form.photos} onChange={(e) => { setForm((f) => ({ ...f, photos: e.target.value })); setPhotoPreviewError(false); }} placeholder="https://..." />
+                <label className="form-label">Foto Armada</label>
+                {/* Pilih file */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleFileChange}
+                />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="form-input"
+                    value={form.photos.startsWith("data:") ? "" : form.photos}
+                    onChange={(e) => { setForm((f) => ({ ...f, photos: e.target.value })); setPhotoPreviewError(false); }}
+                    placeholder="https://... atau pilih file di bawah"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      padding: "10px 16px",
+                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--border-subtle)",
+                      background: "var(--bg-subtle)",
+                      color: "var(--text-main)",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Pilih File
+                  </button>
+                </div>
                 {form.photos && !photoPreviewError && (
-                  <img src={form.photos} alt="preview" onError={() => setPhotoPreviewError(true)} style={{ marginTop: 8, width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 8 }} />
+                  <div style={{ marginTop: 10, position: "relative" }}>
+                    <img
+                      src={form.photos}
+                      alt="preview"
+                      onError={() => setPhotoPreviewError(true)}
+                      style={{ width: "100%", maxHeight: 120, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border-subtle)" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setForm((f) => ({ ...f, photos: "" })); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                      style={{
+                        position: "absolute", top: 6, right: 6,
+                        width: 24, height: 24, borderRadius: "50%",
+                        background: "rgba(0,0,0,0.55)", border: "none",
+                        color: "#fff", fontSize: 14, cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
+                      }}
+                    >×</button>
+                  </div>
                 )}
               </div>
 

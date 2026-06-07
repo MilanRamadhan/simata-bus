@@ -49,30 +49,36 @@ model Review {
 }
 
 model BusSchedule {
-  id            String   @id @default(cuid())
-  agencyId      String
-  agency        TravelAgency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  agencyName    String
-  busName       String
-  origin        String
-  destination   String
-  date          String
-  departureTime String
-  arrivalTime   String
-  price         Int
-  totalSeats    Int
-  bookedSeats   String   // Stored as JSON string []
-  busClass      String
-  isRecurring   Boolean  @default(false)
-  recurringDays String?  // e.g., "Monday,Tuesday,Wednesday"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default(cuid())
+  agencyId          String
+  agency            TravelAgency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  agencyName        String
+  busName           String
+  origin            String
+  destination       String
+  date              String
+  departureTime     String
+  arrivalTime       String
+  price             Int
+  totalSeats        Int
+  bookedSeats       String   // Stored as JSON string []
+  busClass          String
+  isRecurring       Boolean  @default(false)
+  recurringDays     String?
+  // Status keberangkatan (untuk jadwal tidak berulang)
+  scheduleStatus    String?  @default("aktif")  // "aktif" | "ditunda" | "dibatalkan"
+  delayNote         String?
+  newDepartureTime  String?
+  // Override per tanggal (untuk jadwal berulang), stored as JSON string
+  dateOverrides     String?  @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Ticket {
   id              String   @id @default(cuid())
-  passengerId     String
-  passenger       User     @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+  passengerId     String?
+  passenger       User?    @relation(fields: [passengerId], references: [id], onDelete: SetNull)
   passengerName   String
   passengerNik    String
   passengerPhone  String

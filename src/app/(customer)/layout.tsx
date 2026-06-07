@@ -16,22 +16,24 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const { user } = useAppStore();
 
+  const guestAllowed = ["/home", "/booking/seat", "/booking/payment"];
+
   useEffect(() => {
-    if (!user && pathname !== "/home") {
+    if (!user && !guestAllowed.includes(pathname)) {
       router.replace("/");
     } else if (user && user.role !== "customer") {
       router.replace(user.role === "admin" || user.role === "provider" ? "/admin/dashboard" : "/");
     }
   }, [user, router, pathname]);
 
-  if (!user && pathname !== "/home") return null;
+  if (!user && !guestAllowed.includes(pathname)) return null;
   if (user && user.role !== "customer") return null;
 
   const isHomePage = pathname === "/home";
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <CustomerNavbar onNavigate={(page) => router.push(NAV_MAP[page] || "/home")} />
+      <CustomerNavbar onNavigate={(page) => router.push(NAV_MAP[page] ?? page)} />
       <div style={{ paddingTop: isHomePage ? 0 : "var(--header-h, 80px)" }}>{children}</div>
     </div>
   );

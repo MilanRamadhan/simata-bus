@@ -3,10 +3,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeSlideUp, staggerContainer, staggerFast, seatPop, scaleIn } from '@/animations/variants';
-import type { BusSchedule, Seat, SeatStatus } from '@/types';
+import type { BusSchedule, Seat, SeatStatus, TravelAgency } from '@/types';
 
 interface Props {
   schedule: BusSchedule;
+  agency?: TravelAgency;
+  bookingDate?: string | null;
   onConfirm: (seatIds: string[]) => void;
   onBack: () => void;
 }
@@ -43,7 +45,7 @@ function seatStyle(status: SeatStatus): React.CSSProperties {
   }
 }
 
-export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
+export default function SeatSelection({ schedule, agency, bookingDate, onConfirm, onBack }: Props) {
   const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
 
   const seats: Seat[] = useMemo(() => {
@@ -100,11 +102,12 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="btn btn-secondary btn-icon"
           onClick={onBack}
-          style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 'var(--radius)', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 'var(--radius)', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
-          <span style={{ fontSize: 24, lineHeight: 1, fontWeight: 700, color: 'var(--text-main)' }}>←</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </motion.button>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
@@ -116,7 +119,7 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 36, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 32, alignItems: 'start' }}>
         {/* ── Seat Map ── */}
         <div style={{
           background: 'var(--bg-white)',
@@ -193,130 +196,73 @@ export default function SeatSelection({ schedule, onConfirm, onBack }: Props) {
           </motion.div>
         </div>
 
-        {/* ── Sidebar ── */}
-        <div style={{ position: 'sticky', top: 'calc(var(--header-h) + 32px)', display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Trip Info */}
-          <div style={{
-            background: 'var(--bg-white)',
-            borderRadius: 'var(--radius-xl)',
-            padding: 32,
-            border: '1px solid var(--border-subtle)',
-            boxShadow: 'var(--shadow-md)',
-          }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)', marginBottom: 24, fontFamily: 'Outfit' }}>
-              Detail Perjalanan
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {/* ── Kolom 2: Detail Perjalanan + Kursi Dipilih ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ background: 'var(--bg-white)', borderRadius: 'var(--radius-xl)', padding: '24px 20px', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-md)' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)', marginBottom: 16, fontFamily: 'Outfit' }}>Detail Perjalanan</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
                 { label: 'Rute', value: `${schedule.origin} → ${schedule.destination}` },
-                { label: 'Tanggal', value: schedule.date },
+                { label: 'Tanggal', value: bookingDate ? new Date(bookingDate + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : (schedule.date || '—') },
                 { label: 'Waktu', value: `${schedule.departureTime} – ${schedule.arrivalTime}` },
                 { label: 'Kelas', value: schedule.busClass },
-                { label: 'Kursi Tersedia', value: `${available} dari ${schedule.totalSeats}` },
-                { label: 'Harga / Kursi', value: formatPrice(schedule.price) },
+                { label: 'Tersedia', value: `${available} / ${schedule.totalSeats}` },
+                { label: 'Harga', value: formatPrice(schedule.price) },
               ].map((item) => (
-                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{item.label}</span>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-main)' }}>{item.value}</span>
+                <div key={item.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{item.value}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Selected Seats Summary */}
+          {/* Kursi Dipilih */}
           <AnimatePresence mode="wait">
             {selectedSeats.size > 0 ? (
-              <motion.div
-                key="selected"
-                variants={scaleIn}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                style={{
-                  padding: 32, borderRadius: 'var(--radius-xl)',
-                  border: '2px solid var(--primary)',
-                  background: 'var(--bg-white)',
-                  boxShadow: 'var(--shadow-lg)',
-                }}
+              <motion.div key="selected" variants={scaleIn} initial="hidden" animate="visible" exit="exit"
+                style={{ padding: 24, borderRadius: 'var(--radius-xl)', border: '2px solid var(--primary)', background: 'var(--bg-white)', boxShadow: 'var(--shadow-lg)' }}
               >
-                {/* Kursi terpilih */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>
                     Kursi Dipilih ({selectedSeats.size})
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {selectedList.map((s) => (
-                      <motion.span
-                        key={s}
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: 'var(--radius-full)',
-                          background: 'var(--grad-primary)',
-                          color: '#fff',
-                          fontWeight: 800,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        }}
-                      >
-                        {s}
-                      </motion.span>
+                      <motion.span key={s} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                        style={{ padding: '6px 14px', borderRadius: 'var(--radius-full)', background: 'var(--grad-primary)', color: '#fff', fontWeight: 800, fontSize: 14, fontFamily: 'Outfit' }}
+                      >{s}</motion.span>
                     ))}
                   </div>
                 </div>
-
-                {/* Rincian harga */}
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, marginBottom: 24 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-                      {formatPrice(schedule.price)} × {selectedSeats.size} kursi
-                    </span>
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                    {formatPrice(schedule.price)} × {selectedSeats.size} kursi
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>Total</span>
-                    <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>Total</span>
+                    <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
                       {formatPrice(totalPrice)}
                     </span>
                   </div>
                 </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   className="btn btn-primary btn-lg"
-                  style={{ width: '100%', padding: '16px 24px', fontSize: 16 }}
+                  style={{ width: '100%', padding: '14px 20px', fontSize: 15 }}
                   onClick={() => onConfirm(selectedList)}
                 >
                   Lanjut Pembayaran
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
                   </svg>
                 </motion.button>
               </motion.div>
             ) : (
-              <motion.div
-                key="empty"
-                variants={fadeSlideUp}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                style={{
-                  padding: 36, textAlign: 'center',
-                  background: 'var(--bg-white)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-xl)',
-                  boxShadow: 'var(--shadow-sm)',
-                }}
+              <motion.div key="empty" variants={fadeSlideUp} initial="hidden" animate="visible" exit="exit"
+                style={{ padding: 28, textAlign: 'center', background: 'var(--bg-white)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}
               >
-                <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 8 }}>
-                  Pilih kursi untuk melanjutkan
-                </p>
-                <p style={{ color: 'var(--text-light)', fontSize: 13 }}>
-                  Kamu bisa pilih lebih dari satu kursi
-                </p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 6 }}>Pilih kursi untuk melanjutkan</p>
+                <p style={{ color: 'var(--text-light)', fontSize: 12 }}>Bisa pilih lebih dari satu kursi</p>
               </motion.div>
             )}
           </AnimatePresence>
