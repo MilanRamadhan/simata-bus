@@ -427,7 +427,7 @@ export default function AgencyManagement() {
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
                     className="form-input"
-                    value={form.photos.startsWith("data:") ? "" : form.photos}
+                    value={(form.photos ?? "").startsWith("data:") ? "" : (form.photos ?? "")}
                     onChange={(e) => { setForm((f) => ({ ...f, photos: e.target.value })); setPhotoPreviewError(false); }}
                     placeholder="https://... atau pilih file di bawah"
                     style={{ flex: 1 }}

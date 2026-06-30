@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shader, ChromaFlow, Swirl } from "shaders/react";
@@ -161,7 +161,7 @@ function useReveal(threshold = 0.3) {
 }
 
 /* ─── Landing Page ─── */
-export default function LandingPage() {
+function LandingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAppStore();
@@ -718,5 +718,13 @@ function MasukSection({ mode, onModeChange }: { mode: "login" | "register"; onMo
         </div>
       </div>
     </section>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense>
+      <LandingPageInner />
+    </Suspense>
   );
 }

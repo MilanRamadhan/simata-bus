@@ -22,7 +22,7 @@ interface AppState {
   updateSchedule: (s: BusSchedule) => void;
   deleteSchedule: (id: string) => void;
   bookTicket: (t: Omit<Ticket, "id" | "bookingDate">) => void;
-  bookSeat: (scheduleId: string, seatId: string) => void;
+  bookSeat: (scheduleId: string, seatId: string | string[]) => void;
   addReview: (review: { agencyId: string; rating: number; comment?: string; photos?: string }) => Promise<{ ok: boolean; error?: string }>;
   // targetDate: jika diisi → override tanggal spesifik (jadwal berulang); jika kosong → update status jadwal itu sendiri
   updateScheduleStatus: (scheduleId: string, status: ScheduleStatus, note: string, newTime?: string, targetDate?: string) => Promise<void>;
